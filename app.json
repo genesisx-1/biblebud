@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Bible Bro",
+    "slug": "bible-bro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E4A8C"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.biblebro.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Bible Bro needs access to your microphone for voice input during Bible study.",
+        "NSSpeechRecognitionUsageDescription": "Bible Bro uses speech recognition to convert your voice to text."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2E4A8C"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.biblebro.app",
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-speech"
+    ]
+  }
+}
