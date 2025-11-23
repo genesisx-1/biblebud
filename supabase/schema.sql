@@ -118,34 +118,6 @@ CREATE POLICY "Users can update their own reading plans"
   ON reading_plans FOR UPDATE
   USING (auth.uid() = user_id);
 
--- Daily progress
-CREATE TABLE IF NOT EXISTS daily_progress (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  date DATE NOT NULL,
-  verses_read TEXT[],
-  reading_completed BOOLEAN DEFAULT FALSE,
-  chat_messages_count INTEGER DEFAULT 0,
-  quiz_score INTEGER DEFAULT 0,
-  notes TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, date)
-);
-
-ALTER TABLE daily_progress ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own daily progress"
-  ON daily_progress FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own daily progress"
-  ON daily_progress FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own daily progress"
-  ON daily_progress FOR UPDATE
-  USING (auth.uid() = user_id);
-
 -- Daily verses (global)
 CREATE TABLE IF NOT EXISTS daily_verses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
