@@ -802,7 +802,7 @@ export const saveQuizResult = async (userId, score, totalQuestions) => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-    return { data, null, error };
+    return { data: null, error };
   }
 };
 
