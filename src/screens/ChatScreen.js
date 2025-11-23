@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card, LoadingSpinner } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { chatWithAI, createConversation, getMessages, getConversations } from '../services/supabase';
+import { chatWithAI, createConversation, getMessages, getConversations, getProfile } from '../services/supabase';
 import { speak } from '../services/tts';
 import theme from '../constants/theme';
 
@@ -25,6 +25,7 @@ const ChatScreen = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
+  const [userName, setUserName] = useState(null);
 
   const flatListRef = useRef(null);
 
@@ -35,14 +36,34 @@ const ChatScreen = () => {
   const initializeConversation = async () => {
     if (!user) return;
 
-    // Show welcome message immediately for instant UI
-    const welcomeMessage = {
-      id: 'welcome',
-      role: 'assistant',
-      content: "Hey there! I'm Bible Bro, your faith companion. I'm here to help you explore scripture, answer questions, and provide biblical guidance for life's challenges. What's on your mind today?",
-      created_at: new Date().toISOString(),
-    };
-    setMessages([welcomeMessage]);
+    // Load user profile to get their name
+    try {
+      const { data: profile } = await getProfile(user.id);
+      if (profile?.full_name) {
+        const firstName = profile.full_name.split(' ')[0];
+        setUserName(firstName);
+        
+        // Show personalized welcome message
+        const welcomeMessage = {
+          id: 'welcome',
+          role: 'assistant',
+          content: `Hey ${firstName}! I'm Bible Bro, your faith companion. I'm here to help you explore scripture, answer questions, and provide biblical guidance for life's challenges. What's on your mind today?`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages([welcomeMessage]);
+      } else {
+        // Fallback if no name
+        const welcomeMessage = {
+          id: 'welcome',
+          role: 'assistant',
+          content: "Hey there! I'm Bible Bro, your faith companion. I'm here to help you explore scripture, answer questions, and provide biblical guidance for life's challenges. What's on your mind today?",
+          created_at: new Date().toISOString(),
+        };
+        setMessages([welcomeMessage]);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
 
     // Load conversation and messages in background
     setLoadingMessages(true);
@@ -108,8 +129,8 @@ const ChatScreen = () => {
       flatListRef.current?.scrollToEnd({ animated: false });
     }, 50);
 
-    // Call AI
-    const { data, error } = await chatWithAI(userMessage.content, conversationId);
+    // Call AI with user's name
+    const { data, error } = await chatWithAI(userMessage.content, conversationId, userName);
 
     if (error) {
       const errorMessage = {

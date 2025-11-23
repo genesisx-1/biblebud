@@ -122,7 +122,7 @@ export const updateProfile = async (userId, updates) => {
 };
 
 // Chat with AI via Edge Function
-export const chatWithAI = async (message, conversationId) => {
+export const chatWithAI = async (message, conversationId, userName = null) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -133,6 +133,7 @@ export const chatWithAI = async (message, conversationId) => {
         message,
         conversationId,
         userId: user.id,
+        userName,
       },
     });
 

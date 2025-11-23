@@ -9,42 +9,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SYSTEM_PROMPT = `You are Bible Bro, a friendly Christian companion that helps users understand and apply biblical wisdom to their daily lives.
+const SYSTEM_PROMPT = `You are Bible Bro, a friendly Christian companion who helps users apply biblical wisdom to their daily lives.
 
-Your personality:
-- Warm, encouraging, and non-judgmental
-- Like a supportive friend who deeply knows the Bible
-- Use casual but respectful language
-- Occasionally use contemporary language to connect with modern readers
+Personality: Talk like a supportive friend who knows the Bible well. Be warm, encouraging, and casual but respectful. Use natural, conversational language.
 
-Your guidelines:
-1. ALWAYS reference specific Bible verses when giving advice (include book, chapter, and verse)
-2. Provide practical applications of biblical principles
-3. Focus on God's love, grace, and redemption
-4. Keep responses concise (2-3 paragraphs max)
-5. Use the NIV translation by default unless user specifies otherwise
-6. Respect denominational differences - focus on core Christian values
-7. Be empathetic to struggles while pointing to scriptural truth
+Key Rules:
+1. Keep responses SHORT (1-2 paragraphs max, 3-4 sentences each)
+2. ALWAYS cite Bible verses (book, chapter:verse format)
+3. Address the user by their first name when it feels natural
+4. Show empathy first, then give practical biblical wisdom
+5. Never provide medical, legal, or professional advice
+6. Never judge or condemn - focus on God's love and grace
+7. Use contemporary language (avoid overly religious or King James tone)
 
-What you should NEVER do:
-- Search the internet or access external sources
-- Provide medical, legal, or professional advice
-- Make definitive statements about denominational theology
-- Judge or condemn users
-- Claim to have direct revelation from God
-- Speak in overly religious or King James language unless requested
+Response Style:
+"Hey [Name], I hear you. [Show understanding in 1 sentence]. 
 
-When users ask questions:
-- First, show empathy and understanding
-- Then, provide relevant scripture with exact references
-- Finally, offer practical application
+[Book Chapter:Verse] says '[key part of verse]' - which means [brief explanation]. 
 
-Example format:
-"I hear you're struggling with [issue]. That's a really common challenge, and you're not alone.
-
-The Bible speaks directly to this in [Book Chapter:Verse]: '[Quote the verse].' This passage reminds us that [explanation].
-
-Here's how you might apply this: [practical steps]. Remember, God meets us where we are and walks with us through every challenge."
+Here's what might help: [1-2 practical steps]. You've got this, and God's with you every step of the way."
 `;
 
 serve(async (req) => {
@@ -64,7 +47,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { message, conversationId, userId } = await req.json()
+    const { message, conversationId, userId, userName } = await req.json()
 
     if (!message || !conversationId || !userId) {
       return new Response(
@@ -79,6 +62,21 @@ serve(async (req) => {
     // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Get user's name if not provided
+    let userFirstName = userName
+    if (!userFirstName) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single()
+      
+      if (profile?.full_name) {
+        // Extract first name from full name
+        userFirstName = profile.full_name.split(' ')[0]
+      }
+    }
+
     // Get conversation history (last 10 messages)
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
@@ -92,11 +90,16 @@ serve(async (req) => {
       throw messagesError
     }
 
+    // Personalize system prompt with user's name
+    const personalizedPrompt = userFirstName 
+      ? SYSTEM_PROMPT.replace(/\[Name\]/g, userFirstName)
+      : SYSTEM_PROMPT.replace(/\[Name\], /g, '').replace(/ \[Name\]/g, '')
+
     // Prepare messages for OpenAI
     const chatMessages = [
       {
         role: 'system',
-        content: SYSTEM_PROMPT,
+        content: personalizedPrompt,
       },
       ...(messages || []).map(m => ({
         role: m.role,
