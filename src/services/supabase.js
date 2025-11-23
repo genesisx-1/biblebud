@@ -336,13 +336,13 @@ export const addAchievement = async (userId, achievementType) => {
   }
 };
 
-// Quiz Questions
+// Quiz Questions - Random (General)
 export const getQuizQuestions = async (limit = 5) => {
   try {
     const { data, error } = await supabase
       .from('quiz_questions')
       .select('*')
-      .limit(20); // Reduced from 100 to 20 for faster initial load
+      .limit(50); // Get more for better randomization
 
     if (error) {
       console.error('Supabase quiz error:', error);
@@ -379,6 +379,102 @@ export const getQuizQuestions = async (limit = 5) => {
     return { data: questionsWithShuffledOptions, error: null };
   } catch (error) {
     console.error('Error in getQuizQuestions:', error);
+    return { data: null, error };
+  }
+};
+
+// Quiz Questions - By Book
+export const getQuizQuestionsByBook = async (book, limit = 5) => {
+  try {
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .or(`book.eq.${book},question_type.eq.general`)
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase quiz by book error:', error);
+      return { data: null, error };
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`No quiz questions for book: ${book}`);
+      return { data: null, error: null };
+    }
+    
+    // Shuffle and take limit
+    const shuffled = [...data].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, limit);
+    
+    // Shuffle options for each question
+    const questionsWithShuffledOptions = selected.map(q => {
+      try {
+        const parsedOptions = typeof q.options === 'string' 
+          ? JSON.parse(q.options) 
+          : q.options;
+        return {
+          ...q,
+          options: Array.isArray(parsedOptions) 
+            ? parsedOptions.sort(() => Math.random() - 0.5)
+            : parsedOptions,
+        };
+      } catch (e) {
+        console.error('Error parsing options:', e);
+        return q;
+      }
+    });
+    
+    return { data: questionsWithShuffledOptions, error: null };
+  } catch (error) {
+    console.error('Error in getQuizQuestionsByBook:', error);
+    return { data: null, error };
+  }
+};
+
+// Quiz Questions - By Chapter
+export const getQuizQuestionsByChapter = async (book, chapter, limit = 5) => {
+  try {
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .or(`and(book.eq.${book},chapter.eq.${chapter}),book.eq.${book},question_type.eq.general`)
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase quiz by chapter error:', error);
+      return { data: null, error };
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`No quiz questions for ${book} chapter ${chapter}`);
+      return { data: null, error: null };
+    }
+    
+    // Shuffle and take limit
+    const shuffled = [...data].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, limit);
+    
+    // Shuffle options for each question
+    const questionsWithShuffledOptions = selected.map(q => {
+      try {
+        const parsedOptions = typeof q.options === 'string' 
+          ? JSON.parse(q.options) 
+          : q.options;
+        return {
+          ...q,
+          options: Array.isArray(parsedOptions) 
+            ? parsedOptions.sort(() => Math.random() - 0.5)
+            : parsedOptions,
+        };
+      } catch (e) {
+        console.error('Error parsing options:', e);
+        return q;
+      }
+    });
+    
+    return { data: questionsWithShuffledOptions, error: null };
+  } catch (error) {
+    console.error('Error in getQuizQuestionsByChapter:', error);
     return { data: null, error };
   }
 };

@@ -7,14 +7,43 @@ import {
   Animated,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button } from '../components';
-import { getQuizQuestions } from '../services/supabase';
+import { getQuizQuestions, getQuizQuestionsByBook, getQuizQuestionsByChapter } from '../services/supabase';
 import theme from '../constants/theme';
 
-const QuizScreen = () => {
+const QUIZ_MODES = {
+  RANDOM: 'random',
+  BOOK: 'book',
+  CHAPTER: 'chapter',
+};
+
+const POPULAR_BOOKS = [
+  { name: 'Genesis', testament: 'Old' },
+  { name: 'Psalms', testament: 'Old' },
+  { name: 'Proverbs', testament: 'Old' },
+  { name: 'Matthew', testament: 'New' },
+  { name: 'Mark', testament: 'New' },
+  { name: 'Luke', testament: 'New' },
+  { name: 'John', testament: 'New' },
+  { name: 'Acts', testament: 'New' },
+  { name: 'Romans', testament: 'New' },
+  { name: '1 Corinthians', testament: 'New' },
+  { name: 'Ephesians', testament: 'New' },
+  { name: 'Philippians', testament: 'New' },
+  { name: 'Revelation', testament: 'New' },
+];
+
+const QuizScreen = ({ route }) => {
+  const [mode, setMode] = useState(QUIZ_MODES.RANDOM);
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [selectedChapter, setSelectedChapter] = useState(null);
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showBookSelector, setShowBookSelector] = useState(false);
+  
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -27,7 +56,23 @@ const QuizScreen = () => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const celebrationAnim = useRef(new Animated.Value(0)).current;
 
-  // Define fallback questions function first
+  // Check if quiz was launched from reading screen
+  useEffect(() => {
+    if (route?.params?.book) {
+      setSelectedBook(route.params.book);
+      if (route.params.chapter) {
+        setSelectedChapter(route.params.chapter);
+        setMode(QUIZ_MODES.CHAPTER);
+      } else {
+        setMode(QUIZ_MODES.BOOK);
+      }
+    }
+  }, [route?.params]);
+
+  useEffect(() => {
+    loadQuestions();
+  }, [mode, selectedBook, selectedChapter]);
+
   const getFallbackQuestions = () => {
     return [
       {
@@ -68,37 +113,68 @@ const QuizScreen = () => {
     ];
   };
 
-  // Cache fallback questions
   const fallbackQuestions = useMemo(() => getFallbackQuestions(), []);
 
-  useEffect(() => {
-    loadQuestions();
-  }, []);
-
   const loadQuestions = async () => {
-    // Show fallback questions immediately for instant UI
     setQuestions(fallbackQuestions);
     setFetching(true);
     
     try {
-      const { data, error } = await getQuizQuestions(5);
+      let data, error;
+      
+      if (mode === QUIZ_MODES.CHAPTER && selectedBook && selectedChapter) {
+        ({ data, error } = await getQuizQuestionsByChapter(selectedBook, selectedChapter, 5));
+      } else if (mode === QUIZ_MODES.BOOK && selectedBook) {
+        ({ data, error } = await getQuizQuestionsByBook(selectedBook, 5));
+      } else {
+        ({ data, error } = await getQuizQuestions(5));
+      }
+      
       if (error) {
         console.error('Quiz error:', error);
-        // Keep fallback questions
       } else if (data && data.length > 0) {
-        // Replace with database questions
         setQuestions(data);
       }
-      // If no data, keep fallback questions
     } catch (error) {
       console.error('Error loading quiz:', error);
-      // Keep fallback questions
     } finally {
       setFetching(false);
     }
   };
 
-  if (questions.length === 0) {
+  const resetQuiz = () => {
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setIsAnswered(false);
+    setScore(0);
+    setShowResults(false);
+    loadQuestions();
+  };
+
+  const handleChangeMode = (newMode) => {
+    setMode(newMode);
+    setShowModeSelector(false);
+    
+    if (newMode === QUIZ_MODES.BOOK || newMode === QUIZ_MODES.CHAPTER) {
+      setShowBookSelector(true);
+    } else {
+      setSelectedBook(null);
+      setSelectedChapter(null);
+      resetQuiz();
+    }
+  };
+
+  const handleSelectBook = (book) => {
+    setSelectedBook(book);
+    setShowBookSelector(false);
+    if (mode === QUIZ_MODES.CHAPTER) {
+      // For now, default to chapter 1
+      setSelectedChapter(1);
+    }
+    resetQuiz();
+  };
+
+  if (questions.length === 0 || fetching) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={theme.colors.primary.royalBlue} />
@@ -120,7 +196,6 @@ const QuizScreen = () => {
 
     if (isCorrect) {
       setScore(score + 1);
-      // Celebration animation
       Animated.sequence([
         Animated.timing(celebrationAnim, {
           toValue: 1,
@@ -138,7 +213,6 @@ const QuizScreen = () => {
 
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
-      // Animate transition
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -152,134 +226,145 @@ const QuizScreen = () => {
         }),
       ]).start();
 
-      setTimeout(() => {
-        setCurrentQuestion(currentQuestion + 1);
-        setSelectedAnswer(null);
-        setIsAnswered(false);
-      }, 200);
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setIsAnswered(false);
     } else {
       setShowResults(true);
     }
   };
 
-  const handleRestart = () => {
-    // Reload questions for a new random quiz
-    loadQuestions();
-    setCurrentQuestion(0);
-    setSelectedAnswer(null);
-    setIsAnswered(false);
-    setScore(0);
-    setShowResults(false);
-  };
-
   if (showResults) {
-    return <ResultsScreen score={score} total={questions.length} onRestart={handleRestart} />;
+    const percentage = (score / questions.length) * 100;
+    const isPerfect = score === questions.length;
+    const isGood = percentage >= 70;
+
+    return (
+      <LinearGradient
+        colors={[theme.colors.primary.royalBlue, theme.colors.gradients.primary[1]]}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.resultsContainer}>
+          <View style={styles.resultsCard}>
+            <Ionicons
+              name={isPerfect ? 'trophy' : isGood ? 'ribbon' : 'star'}
+              size={80}
+              color={theme.colors.primary.warmGold}
+            />
+            <Text style={styles.resultsTitle}>
+              {isPerfect ? 'Perfect Score!' : isGood ? 'Great Job!' : 'Keep Learning!'}
+            </Text>
+            <Text style={styles.resultsScore}>
+              {score} / {questions.length}
+            </Text>
+            <Text style={styles.resultsPercentage}>{percentage.toFixed(0)}%</Text>
+            
+            {mode !== QUIZ_MODES.RANDOM && (
+              <Text style={styles.quizContext}>
+                {mode === QUIZ_MODES.CHAPTER && `${selectedBook} ${selectedChapter}`}
+                {mode === QUIZ_MODES.BOOK && selectedBook}
+              </Text>
+            )}
+
+            <View style={styles.resultsButtons}>
+              <Button title="Try Again" onPress={resetQuiz} style={styles.resultButton} />
+              <Button
+                title="Change Mode"
+                onPress={() => {
+                  setShowResults(false);
+                  setShowModeSelector(true);
+                }}
+                variant="outline"
+                style={styles.resultButton}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={[theme.colors.primary.royalBlue, theme.colors.gradients.primary[1]]}
-        style={styles.header}
-      >
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <Animated.View style={[styles.progressFill, { width: `${progress}%` }]} />
-          </View>
-          <TouchableOpacity style={styles.closeButton}>
-            <Ionicons name="close" size={28} color={theme.colors.primary.pureWhite} />
-          </TouchableOpacity>
-        </View>
+      {/* Header with Mode Selector */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.modeButton}
+          onPress={() => setShowModeSelector(true)}
+        >
+          <Ionicons name="options" size={20} color={theme.colors.primary.royalBlue} />
+          <Text style={styles.modeButtonText}>
+            {mode === QUIZ_MODES.RANDOM && 'Random Quiz'}
+            {mode === QUIZ_MODES.BOOK && `${selectedBook} Quiz`}
+            {mode === QUIZ_MODES.CHAPTER && `${selectedBook} ${selectedChapter}`}
+          </Text>
+          <Ionicons name="chevron-down" size={16} color={theme.colors.text.secondary} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Question Counter */}
-        <Text style={styles.questionCounter}>
-          Question {currentQuestion + 1} of {questions.length}
-        </Text>
-      </LinearGradient>
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressBar, { width: `${progress}%` }]} />
+      </View>
 
+      {/* Question Card */}
       <ScrollView contentContainerStyle={styles.content}>
-        <Animated.View style={[styles.questionContainer, { opacity: fadeAnim }]}>
-          {/* Question */}
-          <Text style={styles.question}>{question.question}</Text>
+        <Animated.View style={[styles.questionCard, { opacity: fadeAnim }]}>
+          <Text style={styles.questionNumber}>
+            Question {currentQuestion + 1} of {questions.length}
+          </Text>
+          <Text style={styles.questionText}>{question.question}</Text>
 
-          {/* Options */}
           <View style={styles.optionsContainer}>
-            {question.options.map((option, index) => (
-              <OptionButton
-                key={index}
-                option={option}
-                isSelected={selectedAnswer === option}
-                isCorrect={option === question.correct_answer}
-                isAnswered={isAnswered}
-                onPress={() => handleSelectAnswer(option)}
-              />
-            ))}
+            {question.options.map((option, index) => {
+              const isSelected = selectedAnswer === option;
+              const isCorrect = option === question.correct_answer;
+              const showCorrect = isAnswered && isCorrect;
+              const showIncorrect = isAnswered && isSelected && !isCorrect;
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionButton,
+                    showCorrect && styles.optionButtonCorrect,
+                    showIncorrect && styles.optionButtonIncorrect,
+                  ]}
+                  onPress={() => handleSelectAnswer(option)}
+                  disabled={isAnswered}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      (showCorrect || showIncorrect) && styles.optionTextBold,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                  {showCorrect && (
+                    <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
+                  )}
+                  {showIncorrect && (
+                    <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* Feedback */}
           {isAnswered && (
-            <Animated.View
-              style={[
-                styles.feedbackContainer,
-                {
-                  backgroundColor:
-                    selectedAnswer === question.correct_answer
-                      ? '#E8F5E9'
-                      : '#FFEBEE',
-                },
-                { opacity: fadeAnim },
-              ]}
-            >
-              <View style={styles.feedbackHeader}>
-                <Ionicons
-                  name={
-                    selectedAnswer === question.correct_answer
-                      ? 'checkmark-circle'
-                      : 'close-circle'
-                  }
-                  size={32}
-                  color={
-                    selectedAnswer === question.correct_answer
-                      ? theme.colors.secondary.sageGreen
-                      : theme.colors.semantic.error
-                  }
-                />
-                <Text
-                  style={[
-                    styles.feedbackTitle,
-                    {
-                      color:
-                        selectedAnswer === question.correct_answer
-                          ? theme.colors.secondary.sageGreen
-                          : theme.colors.semantic.error,
-                    },
-                  ]}
-                >
-                  {selectedAnswer === question.correct_answer ? 'Correct!' : 'Not quite'}
-                </Text>
-              </View>
-              <Text style={styles.referenceText}>
-                Scripture: {question.reference}
-              </Text>
-            </Animated.View>
+            <Card style={styles.explanationCard}>
+              <Text style={styles.explanationLabel}>Scripture Reference:</Text>
+              <Text style={styles.explanationText}>{question.reference}</Text>
+            </Card>
+          )}
+
+          {isAnswered && (
+            <Button title="Next Question" onPress={handleNext} style={styles.nextButton} />
           )}
         </Animated.View>
-      </ScrollView>
 
-      {/* Next Button */}
-      {isAnswered && (
-        <View style={styles.footer}>
-          <Button
-            title={currentQuestion === questions.length - 1 ? 'See Results' : 'Next'}
-            onPress={handleNext}
-            style={styles.nextButton}
-          />
-        </View>
-      )}
-
-      {/* Celebration Overlay */}
-      {selectedAnswer === question.correct_answer && isAnswered && (
+        {/* Celebration Animation */}
         <Animated.View
           style={[
             styles.celebrationOverlay,
@@ -289,7 +374,7 @@ const QuizScreen = () => {
                 {
                   scale: celebrationAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.5, 1.2],
+                    outputRange: [0.5, 1.5],
                   }),
                 },
               ],
@@ -297,155 +382,90 @@ const QuizScreen = () => {
           ]}
           pointerEvents="none"
         >
-          <Ionicons name="trophy" size={100} color={theme.colors.primary.warmGold} />
+          <Ionicons name="star" size={100} color={theme.colors.primary.warmGold} />
         </Animated.View>
-      )}
-    </View>
-  );
-};
+      </ScrollView>
 
-const OptionButton = ({ option, isSelected, isCorrect, isAnswered, onPress }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    if (!isAnswered) {
-      Animated.spring(scaleAnim, {
-        toValue: 0.95,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const getBackgroundColor = () => {
-    if (!isAnswered) {
-      return isSelected ? theme.colors.background.lightBlue : theme.colors.background.card;
-    }
-
-    if (isSelected && isCorrect) {
-      return '#E8F5E9'; // Green
-    }
-
-    if (isSelected && !isCorrect) {
-      return '#FFEBEE'; // Red
-    }
-
-    if (isCorrect) {
-      return '#E8F5E9'; // Show correct answer
-    }
-
-    return theme.colors.background.card;
-  };
-
-  const getBorderColor = () => {
-    if (!isAnswered) {
-      return isSelected ? theme.colors.primary.royalBlue : theme.colors.border.light;
-    }
-
-    if (isSelected && isCorrect) {
-      return theme.colors.secondary.sageGreen;
-    }
-
-    if (isSelected && !isCorrect) {
-      return theme.colors.semantic.error;
-    }
-
-    if (isCorrect) {
-      return theme.colors.secondary.sageGreen;
-    }
-
-    return theme.colors.border.light;
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={isAnswered}
-        activeOpacity={0.8}
+      {/* Mode Selector Modal */}
+      <Modal
+        visible={showModeSelector}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowModeSelector(false)}
       >
-        <View
-          style={[
-            styles.optionButton,
-            {
-              backgroundColor: getBackgroundColor(),
-              borderColor: getBorderColor(),
-            },
-          ]}
-        >
-          <Text style={styles.optionText}>{option}</Text>
-          {isAnswered && isCorrect && (
-            <Ionicons
-              name="checkmark-circle"
-              size={24}
-              color={theme.colors.secondary.sageGreen}
-            />
-          )}
-          {isAnswered && isSelected && !isCorrect && (
-            <Ionicons name="close-circle" size={24} color={theme.colors.semantic.error} />
-          )}
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Quiz Mode</Text>
+              <TouchableOpacity onPress={() => setShowModeSelector(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.modeOption}
+              onPress={() => handleChangeMode(QUIZ_MODES.RANDOM)}
+            >
+              <Ionicons name="shuffle" size={24} color={theme.colors.primary.royalBlue} />
+              <View style={styles.modeOptionText}>
+                <Text style={styles.modeOptionTitle}>Random Quiz</Text>
+                <Text style={styles.modeOptionDesc}>Mixed questions from all books</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modeOption}
+              onPress={() => handleChangeMode(QUIZ_MODES.BOOK)}
+            >
+              <Ionicons name="book" size={24} color={theme.colors.primary.royalBlue} />
+              <View style={styles.modeOptionText}>
+                <Text style={styles.modeOptionTitle}>Book Quiz</Text>
+                <Text style={styles.modeOptionDesc}>Test knowledge of a specific book</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modeOption}
+              onPress={() => handleChangeMode(QUIZ_MODES.CHAPTER)}
+            >
+              <Ionicons name="document-text" size={24} color={theme.colors.primary.royalBlue} />
+              <View style={styles.modeOptionText}>
+                <Text style={styles.modeOptionTitle}>Chapter Quiz</Text>
+                <Text style={styles.modeOptionDesc}>Test knowledge of a specific chapter</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
+      </Modal>
 
-const ResultsScreen = ({ score, total, onRestart }) => {
-  const percentage = (score / total) * 100;
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 6,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  return (
-    <LinearGradient
-      colors={[theme.colors.primary.royalBlue, theme.colors.gradients.primary[1]]}
-      style={styles.resultsContainer}
-    >
-      <Animated.View style={[styles.resultsContent, { transform: [{ scale: scaleAnim }] }]}>
-        <Ionicons name="trophy" size={100} color={theme.colors.primary.warmGold} />
-
-        <Text style={styles.resultsTitle}>Quiz Complete!</Text>
-
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>
-            {score} / {total}
-          </Text>
-          <Text style={styles.percentageText}>{percentage.toFixed(0)}%</Text>
+      {/* Book Selector Modal */}
+      <Modal
+        visible={showBookSelector}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowBookSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a Book</Text>
+              <TouchableOpacity onPress={() => setShowBookSelector(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {POPULAR_BOOKS.map((book) => (
+                <TouchableOpacity
+                  key={book.name}
+                  style={styles.bookOption}
+                  onPress={() => handleSelectBook(book.name)}
+                >
+                  <Text style={styles.bookOptionText}>{book.name}</Text>
+                  <Text style={styles.bookOptionTestament}>{book.testament} Testament</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
-
-        <Text style={styles.resultsMessage}>
-          {percentage >= 80
-            ? 'Excellent work! You know your Bible!'
-            : percentage >= 60
-            ? 'Great job! Keep studying!'
-            : 'Good effort! Keep learning!'}
-        </Text>
-
-        <Button
-          title="Try Again"
-          onPress={onRestart}
-          style={styles.restartButton}
-          icon={<Ionicons name="refresh" size={20} color={theme.colors.primary.pureWhite} />}
-        />
-      </Animated.View>
-    </LinearGradient>
+      </Modal>
+    </View>
   );
 };
 
@@ -454,145 +474,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
-  header: {
-    paddingTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-  },
-  progressBar: {
-    flex: 1,
-    height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: theme.borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.primary.warmGold,
-    borderRadius: theme.borderRadius.full,
-  },
-  closeButton: {
-    padding: theme.spacing.xs,
-  },
-  questionCounter: {
-    color: theme.colors.primary.pureWhite,
-    fontSize: theme.typography.fontSize.md,
-    marginTop: theme.spacing.md,
-    fontWeight: theme.typography.fontWeight.semibold,
-  },
-  content: {
-    flexGrow: 1,
-    padding: theme.spacing.md,
-  },
-  questionContainer: {
-    flex: 1,
-  },
-  question: {
-    fontSize: theme.typography.fontSize.xxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xl,
-  },
-  optionsContainer: {
-    gap: theme.spacing.md,
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
-    ...theme.shadows.small,
-  },
-  optionText: {
-    fontSize: theme.typography.fontSize.lg,
-    color: theme.colors.text.primary,
-    fontWeight: theme.typography.fontWeight.medium,
-    flex: 1,
-  },
-  feedbackContainer: {
-    marginTop: theme.spacing.xl,
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-  },
-  feedbackHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  feedbackTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.bold,
-  },
-  referenceText: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.secondary,
-  },
-  footer: {
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.background.primary,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border.light,
-  },
-  nextButton: {
-    width: '100%',
-  },
-  celebrationOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -50,
-    marginTop: -50,
-  },
-  resultsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
-  resultsContent: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.primary,
-    padding: theme.spacing.xxl,
-    borderRadius: theme.borderRadius.xl,
-    ...theme.shadows.large,
-  },
-  resultsTitle: {
-    fontSize: theme.typography.fontSize.xxxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing.lg,
-  },
-  scoreContainer: {
-    alignItems: 'center',
-    marginVertical: theme.spacing.xl,
-  },
-  scoreText: {
-    fontSize: theme.typography.fontSize.huge,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.primary.royalBlue,
-  },
-  percentageText: {
-    fontSize: theme.typography.fontSize.xl,
-    color: theme.colors.text.secondary,
-    marginTop: theme.spacing.sm,
-  },
-  resultsMessage: {
-    fontSize: theme.typography.fontSize.lg,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  restartButton: {
-    minWidth: 200,
-  },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -600,6 +481,207 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.secondary,
+  },
+  header: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.light,
+  },
+  modeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.md,
+  },
+  modeButtonText: {
+    flex: 1,
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.text.primary,
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: theme.colors.border.light,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: theme.colors.secondary.sageGreen,
+  },
+  content: {
+    padding: theme.spacing.md,
+  },
+  questionCard: {
+    gap: theme.spacing.lg,
+  },
+  questionNumber: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    fontWeight: theme.typography.fontWeight.semibold,
+  },
+  questionText: {
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
+    lineHeight: theme.typography.fontSize.xl * theme.typography.lineHeight.relaxed,
+  },
+  optionsContainer: {
+    gap: theme.spacing.sm,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.border.light,
+  },
+  optionButtonCorrect: {
+    borderColor: theme.colors.success,
+    backgroundColor: theme.colors.success + '20',
+  },
+  optionButtonIncorrect: {
+    borderColor: theme.colors.error,
+    backgroundColor: theme.colors.error + '20',
+  },
+  optionText: {
+    flex: 1,
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.primary,
+  },
+  optionTextBold: {
+    fontWeight: theme.typography.fontWeight.bold,
+  },
+  explanationCard: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.lightBlue,
+  },
+  explanationLabel: {
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.primary.royalBlue,
+    marginBottom: theme.spacing.xs,
+  },
+  explanationText: {
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.primary,
+  },
+  nextButton: {
+    marginTop: theme.spacing.md,
+  },
+  celebrationOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -50,
+    marginLeft: -50,
+  },
+  resultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  resultsCard: {
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  resultsTitle: {
+    fontSize: theme.typography.fontSize.xxl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
+  },
+  resultsScore: {
+    fontSize: theme.typography.fontSize.huge,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.primary.royalBlue,
+  },
+  resultsPercentage: {
+    fontSize: theme.typography.fontSize.xl,
+    color: theme.colors.text.secondary,
+  },
+  quizContext: {
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.secondary,
+    fontStyle: 'italic',
+  },
+  resultsButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+    width: '100%',
+  },
+  resultButton: {
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.colors.background.primary,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    maxHeight: '70%',
+    padding: theme.spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  modalTitle: {
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
+  },
+  modeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+  },
+  modeOptionText: {
+    flex: 1,
+  },
+  modeOptionTitle: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.text.primary,
+  },
+  modeOptionDesc: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    marginTop: theme.spacing.xs,
+  },
+  bookOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+  },
+  bookOptionText: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.text.primary,
+  },
+  bookOptionTestament: {
+    fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
   },
 });

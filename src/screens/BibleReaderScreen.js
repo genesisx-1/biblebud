@@ -412,6 +412,22 @@ const BibleReaderScreen = ({ navigation }) => {
           )}
         </Card>
 
+        {/* Test Knowledge Button */}
+        {!loading && verseData && (
+          <Button
+            title="Test Your Knowledge"
+            onPress={() => {
+              navigation.navigate('Quiz', {
+                book: verseData.book || manualBook,
+                chapter: verseData.chapter || manualChapter,
+              });
+            }}
+            variant="outline"
+            icon={<Ionicons name="trophy" size={20} color={theme.colors.primary.royalBlue} />}
+            style={styles.testKnowledgeButton}
+          />
+        )}
+
         {/* Navigation for Reading Plan */}
         {mode === READING_MODES.PLAN && activePlan && (
           <View style={styles.navigationButtons}>
@@ -691,6 +707,9 @@ const styles = StyleSheet.create({
   },
   changePlanButton: {
     marginBottom: theme.spacing.xl,
+  },
+  testKnowledgeButton: {
+    marginVertical: theme.spacing.md,
   },
   modalOverlay: {
     flex: 1,
