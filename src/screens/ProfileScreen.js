@@ -10,18 +10,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, Input } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { getProfile, updateProfile, signOut } from '../services/supabase';
+import { getProfile, updateProfile, signOut, getUserStats } from '../services/supabase';
 import theme from '../constants/theme';
 
 const ProfileScreen = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState(null);
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState('');
   const [bibleTranslation, setBibleTranslation] = useState('NIV');
 
   useEffect(() => {
     loadProfile();
+    loadStats();
   }, []);
 
   const loadProfile = async () => {
@@ -32,6 +34,15 @@ const ProfileScreen = () => {
       setProfile(data);
       setFullName(data.full_name || '');
       setBibleTranslation(data.bible_translation || 'NIV');
+    }
+  };
+
+  const loadStats = async () => {
+    if (!user) return;
+
+    const { data } = await getUserStats(user.id);
+    if (data) {
+      setStats(data);
     }
   };
 
@@ -156,14 +167,14 @@ const ProfileScreen = () => {
 
           <View style={styles.statItem}>
             <Ionicons name="book" size={32} color={theme.colors.primary.royalBlue} />
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{stats?.plansCompleted || 0}</Text>
             <Text style={styles.statLabel}>Plans Completed</Text>
           </View>
 
           <View style={styles.statItem}>
-            <Ionicons name="chatbubbles" size={32} color={theme.colors.secondary.sageGreen} />
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Conversations</Text>
+            <Ionicons name="trophy" size={32} color={theme.colors.primary.warmGold} />
+            <Text style={styles.statValue}>{stats?.quizzesTaken || 0}</Text>
+            <Text style={styles.statLabel}>Quizzes Taken</Text>
           </View>
         </View>
       </Card>
