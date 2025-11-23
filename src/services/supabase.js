@@ -383,27 +383,105 @@ export const getQuizQuestions = async (limit = 5) => {
   }
 };
 
-// Quiz Questions - By Book (fallback to random if book column doesn't exist)
+// Quiz Questions - By Book
 export const getQuizQuestionsByBook = async (book, limit = 5) => {
   try {
-    // For now, just return random questions since the migration hasn't been run yet
-    // This will work until you run the database migration
-    return await getQuizQuestions(limit);
+    // Get questions for this book, or general questions if none found
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .or(`book.eq.${book},question_type.eq.general`)
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase quiz by book error:', error);
+      // Fallback to random
+      return await getQuizQuestions(limit);
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`No quiz questions for book: ${book}`);
+      return await getQuizQuestions(limit);
+    }
+    
+    // Shuffle and take limit
+    const shuffled = [...data].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, limit);
+    
+    // Shuffle options for each question
+    const questionsWithShuffledOptions = selected.map(q => {
+      try {
+        const parsedOptions = typeof q.options === 'string' 
+          ? JSON.parse(q.options) 
+          : q.options;
+        return {
+          ...q,
+          options: Array.isArray(parsedOptions) 
+            ? parsedOptions.sort(() => Math.random() - 0.5)
+            : parsedOptions,
+        };
+      } catch (e) {
+        console.error('Error parsing options:', e);
+        return q;
+      }
+    });
+    
+    return { data: questionsWithShuffledOptions, error: null };
   } catch (error) {
     console.error('Error in getQuizQuestionsByBook:', error);
-    return { data: null, error };
+    // Fallback to random
+    return await getQuizQuestions(limit);
   }
 };
 
-// Quiz Questions - By Chapter (fallback to random if chapter column doesn't exist)
+// Quiz Questions - By Chapter
 export const getQuizQuestionsByChapter = async (book, chapter, limit = 5) => {
   try {
-    // For now, just return random questions since the migration hasn't been run yet
-    // This will work until you run the database migration
-    return await getQuizQuestions(limit);
+    // Get questions for this chapter, then book, then general
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .or(`and(book.eq.${book},chapter.eq.${chapter}),book.eq.${book},question_type.eq.general`)
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase quiz by chapter error:', error);
+      // Fallback to random
+      return await getQuizQuestions(limit);
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`No quiz questions for ${book} chapter ${chapter}`);
+      return await getQuizQuestions(limit);
+    }
+    
+    // Shuffle and take limit
+    const shuffled = [...data].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, limit);
+    
+    // Shuffle options for each question
+    const questionsWithShuffledOptions = selected.map(q => {
+      try {
+        const parsedOptions = typeof q.options === 'string' 
+          ? JSON.parse(q.options) 
+          : q.options;
+        return {
+          ...q,
+          options: Array.isArray(parsedOptions) 
+            ? parsedOptions.sort(() => Math.random() - 0.5)
+            : parsedOptions,
+        };
+      } catch (e) {
+        console.error('Error parsing options:', e);
+        return q;
+      }
+    });
+    
+    return { data: questionsWithShuffledOptions, error: null };
   } catch (error) {
     console.error('Error in getQuizQuestionsByChapter:', error);
-    return { data: null, error };
+    // Fallback to random
+    return await getQuizQuestions(limit);
   }
 };
 

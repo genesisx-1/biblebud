@@ -301,12 +301,22 @@ function generateQuestions() {
     }
   });
 
-  // Output SQL
+  // Output SQL - escape single quotes in ALL text fields including JSON
   questions.forEach((q, index) => {
     const isLast = index === questions.length - 1;
     const comma = isLast ? ';' : ',';
     
-    console.log(`  ('${q.question.replace(/'/g, "''")}', '${q.options}', '${q.correct_answer.replace(/'/g, "''")}', '${q.reference}', '${q.difficulty}', '${q.category}', ${q.book ? `'${q.book}'` : 'NULL'}, ${q.chapter || 'NULL'}, '${q.question_type}')${comma}`);
+    // Escape single quotes in all text fields
+    const escapedQuestion = q.question.replace(/'/g, "''");
+    const escapedCorrect = q.correct_answer.replace(/'/g, "''");
+    const escapedReference = q.reference.replace(/'/g, "''");
+    const escapedCategory = q.category.replace(/'/g, "''");
+    const escapedBook = q.book ? q.book.replace(/'/g, "''") : null;
+    
+    // Options is JSON string - escape single quotes inside the JSON
+    const escapedOptions = q.options.replace(/'/g, "''");
+    
+    console.log(`  ('${escapedQuestion}', '${escapedOptions}', '${escapedCorrect}', '${escapedReference}', '${q.difficulty}', '${escapedCategory}', ${escapedBook ? `'${escapedBook}'` : 'NULL'}, ${q.chapter || 'NULL'}, '${q.question_type}')${comma}`);
   });
 
   console.log(`\n-- Total questions generated: ${questions.length}`);

@@ -3001,4 +3001,4 @@ VALUES
   ('What is the main theme of Revelation chapter 22?', '["God''s love and grace","Faith and obedience","Wisdom and understanding","Salvation and redemption"]', 'Faith and obedience', 'Revelation 22', 'medium', 'New Testament', 'Revelation', 22, 'chapter'),
   ('How many verses are typically in Revelation chapter 22?', '["10-20 verses","20-30 verses","30-40 verses","40+ verses"]', '20-30 verses', 'Revelation 22', 'easy', 'New Testament', 'Revelation', 22, 'chapter');
 
--- Total questions generated: 2996
+-- Total questions: 2996
