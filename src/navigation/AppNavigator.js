@@ -11,6 +11,7 @@ import ReadingPlansScreen from '../screens/ReadingPlansScreen';
 import QuizScreen from '../screens/QuizScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import BibleReadingScreen from '../screens/BibleReadingScreen';
+import BibleReaderScreen from '../screens/BibleReaderScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -34,6 +35,17 @@ const HomeStack = () => {
           headerTintColor: theme.colors.primary.pureWhite,
         }}
       />
+      <Stack.Screen 
+        name="Chat" 
+        component={ChatScreen}
+        options={{
+          title: 'Bible Chat',
+          headerStyle: {
+            backgroundColor: theme.colors.primary.royalBlue,
+          },
+          headerTintColor: theme.colors.primary.pureWhite,
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -47,10 +59,10 @@ const TabNavigator = () => {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Chat') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'Plans') {
+          } else if (route.name === 'Bible') {
             iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Plans') {
+            iconName = focused ? 'library' : 'library-outline';
           } else if (route.name === 'Quiz') {
             iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Profile') {
@@ -90,10 +102,10 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Chat"
-        component={ChatScreen}
+        name="Bible"
+        component={BibleReaderScreen}
         options={{
-          title: 'Bible Chat',
+          title: 'Bible Reader',
         }}
       />
       <Tab.Screen
