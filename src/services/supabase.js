@@ -867,50 +867,6 @@ export const getUserQuizStats = async (userId) => {
   }
 };
 
-// Daily Progress Tracking
-export const updateDailyProgress = async (userId, date, updates) => {
-  try {
-    // Try to update existing record
-    const { data: existing } = await supabase
-      .from('daily_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', date)
-      .single();
-    
-    if (existing) {
-      // Update existing
-      const { data, error } = await supabase
-        .from('daily_progress')
-        .update(updates)
-        .eq('id', existing.id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return { data, error: null };
-    } else {
-      // Insert new
-      const { data, error } = await supabase
-        .from('daily_progress')
-        .insert([
-          {
-            user_id: userId,
-            date,
-            ...updates,
-          },
-        ])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return { data, error: null };
-    }
-  } catch (error) {
-    return { data: null, error };
-  }
-};
-
 // Get user stats (for profile)
 export const getUserStats = async (userId) => {
   try {
