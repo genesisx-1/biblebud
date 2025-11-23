@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card, LoadingSpinner } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { chatWithAI, createConversation, getMessages } from '../services/supabase';
+import { chatWithAI, createConversation, getMessages, getConversations } from '../services/supabase';
 import { speak } from '../services/tts';
 import theme from '../constants/theme';
 
@@ -22,6 +22,7 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
 
@@ -29,24 +30,62 @@ const ChatScreen = () => {
 
   useEffect(() => {
     initializeConversation();
-  }, []);
+  }, [user]);
 
   const initializeConversation = async () => {
     if (!user) return;
 
-    const { data } = await createConversation(user.id, 'Chat with Bible Bro');
-    if (data) {
-      setConversationId(data.id);
+    // Show welcome message immediately for instant UI
+    const welcomeMessage = {
+      id: 'welcome',
+      role: 'assistant',
+      content: "Hey there! I'm Bible Bro, your faith companion. I'm here to help you explore scripture, answer questions, and provide biblical guidance for life's challenges. What's on your mind today?",
+      created_at: new Date().toISOString(),
+    };
+    setMessages([welcomeMessage]);
 
-      // Add welcome message
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: "Hey there! I'm Bible Bro, your faith companion. I'm here to help you explore scripture, answer questions, and provide biblical guidance for life's challenges. What's on your mind today?",
-          created_at: new Date().toISOString(),
-        },
-      ]);
+    // Load conversation and messages in background
+    setLoadingMessages(true);
+    try {
+      // Try to get existing conversation first
+      const { data: conversations, error: convError } = await getConversations(user.id);
+      
+      if (convError) {
+        console.error('Error loading conversations:', convError);
+        // Create new conversation on error
+        const { data } = await createConversation(user.id, 'Chat with Bible Bro');
+        if (data) {
+          setConversationId(data.id);
+        }
+        setLoadingMessages(false);
+        return;
+      }
+
+      let existingConversation = conversations?.[0]; // Get most recent conversation
+
+      if (existingConversation) {
+        setConversationId(existingConversation.id);
+        // Load existing messages (limited to last 50 for performance)
+        const { data: existingMessages, error: msgError } = await getMessages(existingConversation.id);
+        
+        if (msgError) {
+          console.error('Error loading messages:', msgError);
+        } else if (existingMessages && existingMessages.length > 0) {
+          // Replace welcome message with actual messages
+          setMessages(existingMessages);
+        }
+        // If no messages, keep welcome message
+      } else {
+        // Create new conversation
+        const { data } = await createConversation(user.id, 'Chat with Bible Bro');
+        if (data) {
+          setConversationId(data.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
@@ -64,10 +103,10 @@ const ChatScreen = () => {
     setInputText('');
     setLoading(true);
 
-    // Scroll to bottom
+    // Scroll to bottom after message is added
     setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      flatListRef.current?.scrollToEnd({ animated: false });
+    }, 50);
 
     // Call AI
     const { data, error } = await chatWithAI(userMessage.content, conversationId);
@@ -95,9 +134,10 @@ const ChatScreen = () => {
     setMessages((prev) => [...prev, aiMessage]);
     setLoading(false);
 
+    // Scroll to bottom after AI response
     setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      flatListRef.current?.scrollToEnd({ animated: false });
+    }, 50);
   };
 
   const handleSpeak = async (message) => {
@@ -112,17 +152,14 @@ const ChatScreen = () => {
     }
   };
 
-  const renderMessage = ({ item, index }) => {
+  // Message component - must be a proper React component to use hooks
+  const MessageItem = ({ item, onSpeak, isSpeaking }) => {
     const isUser = item.role === 'user';
     const scaleAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start();
+      // Only animate on mount, not on every render
+      scaleAnim.setValue(1);
     }, []);
 
     return (
@@ -158,10 +195,10 @@ const ChatScreen = () => {
           {!isUser && (
             <TouchableOpacity
               style={styles.speakButton}
-              onPress={() => handleSpeak(item)}
+              onPress={() => onSpeak(item)}
             >
               <Ionicons
-                name={speakingMessageId === item.id ? 'stop-circle-outline' : 'volume-medium-outline'}
+                name={isSpeaking ? 'stop-circle-outline' : 'volume-medium-outline'}
                 size={18}
                 color={theme.colors.primary.royalBlue}
               />
@@ -178,19 +215,27 @@ const ChatScreen = () => {
     );
   };
 
+  const renderMessage = ({ item }) => {
+    return (
+      <MessageItem
+        item={item}
+        onSpeak={handleSpeak}
+        isSpeaking={speakingMessageId === item.id}
+      />
+    );
+  };
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={true}
       />
 
       {loading && (
@@ -208,8 +253,10 @@ const ChatScreen = () => {
           onChangeText={setInputText}
           placeholder="Ask me anything about the Bible..."
           placeholderTextColor={theme.colors.text.light}
-          multiline
+          multiline={false}
           maxLength={500}
+          blurOnSubmit={false}
+          onSubmitEditing={handleSend}
         />
         <TouchableOpacity
           style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
@@ -223,7 +270,7 @@ const ChatScreen = () => {
           />
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -325,8 +372,9 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     padding: theme.spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? theme.spacing.md + 20 : theme.spacing.md,
     backgroundColor: theme.colors.background.primary,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border.light,
@@ -334,12 +382,15 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    maxHeight: 100,
-    padding: theme.spacing.md,
+    height: 44,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 0,
     backgroundColor: theme.colors.background.secondary,
     borderRadius: theme.borderRadius.md,
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text.primary,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   sendButton: {
     width: 48,

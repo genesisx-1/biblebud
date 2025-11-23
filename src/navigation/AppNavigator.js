@@ -10,9 +10,33 @@ import ChatScreen from '../screens/ChatScreen';
 import ReadingPlansScreen from '../screens/ReadingPlansScreen';
 import QuizScreen from '../screens/QuizScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import BibleReadingScreen from '../screens/BibleReadingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+const HomeStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="HomeMain" 
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="BibleReading" 
+        component={BibleReadingScreen}
+        options={{
+          title: 'Today\'s Reading',
+          headerStyle: {
+            backgroundColor: theme.colors.primary.royalBlue,
+          },
+          headerTintColor: theme.colors.primary.pureWhite,
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
 
 const TabNavigator = () => {
   return (
@@ -59,9 +83,10 @@ const TabNavigator = () => {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStack}
         options={{
           title: 'Bible Bro',
+          headerShown: false,
         }}
       />
       <Tab.Screen

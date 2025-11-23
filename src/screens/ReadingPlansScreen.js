@@ -48,7 +48,7 @@ const PLAN_TEMPLATES = [
   },
 ];
 
-const ReadingPlansScreen = () => {
+const ReadingPlansScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [plans, setPlans] = useState([]);
   const [activePlan, setActivePlan] = useState(null);
@@ -66,6 +66,23 @@ const ReadingPlansScreen = () => {
     // Find active plan
     const active = data?.find((p) => p.is_active && !p.completed_at);
     setActivePlan(active);
+  };
+
+  const handleContinueReading = () => {
+    if (!activePlan || !navigation) return;
+    
+    // Navigate to Home tab, then to BibleReading screen
+    navigation.navigate('Home', {
+      screen: 'BibleReading',
+      params: {
+        readingPlan: {
+          plan_type: activePlan.plan_type,
+          current_day: activePlan.current_day,
+          total_days: activePlan.total_days,
+          title: activePlan.title,
+        },
+      },
+    });
   };
 
   const handleStartPlan = async (template) => {
@@ -118,7 +135,7 @@ const ReadingPlansScreen = () => {
 
           <Button
             title="Continue Reading"
-            onPress={() => {}}
+            onPress={handleContinueReading}
             style={styles.continueButton}
             icon={<Ionicons name="book-outline" size={20} color={theme.colors.primary.pureWhite} />}
           />

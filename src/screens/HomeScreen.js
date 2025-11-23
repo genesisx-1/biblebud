@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, StreakCounter, ProgressCircle } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { getProfile, getDailyVerse, getDailyProgress } from '../services/supabase';
+import { getProfile, getDailyVerse, getDailyProgress, getReadingPlans } from '../services/supabase';
 import { speak } from '../services/tts';
 import { getGreeting, getTodayDate } from '../utils/dateUtils';
 import theme from '../constants/theme';
@@ -21,6 +21,7 @@ const HomeScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
   const [dailyVerse, setDailyVerse] = useState(null);
   const [todayProgress, setTodayProgress] = useState(null);
+  const [activePlan, setActivePlan] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -62,6 +63,13 @@ const HomeScreen = ({ navigation }) => {
     // Load today's progress
     const { data: progressData } = await getDailyProgress(user.id, getTodayDate());
     setTodayProgress(progressData);
+
+    // Load active reading plan
+    const { data: plans } = await getReadingPlans(user.id);
+    if (plans) {
+      const active = plans.find((p) => p.is_active && !p.completed_at);
+      setActivePlan(active);
+    }
   };
 
   const handleRefresh = async () => {
@@ -144,7 +152,7 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Plans')}
+            onPress={() => navigation.navigate('BibleReading')}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="book" size={32} color={theme.colors.primary.pureWhite} />
@@ -205,17 +213,42 @@ const HomeScreen = ({ navigation }) => {
         </Card>
 
         {/* Continue Reading Plan */}
-        <Card style={styles.planCard}>
-          <View style={styles.planHeader}>
-            <Text style={styles.planTitle}>Active Reading Plan</Text>
-            <Ionicons name="arrow-forward" size={20} color={theme.colors.primary.royalBlue} />
-          </View>
-          <Text style={styles.planName}>Gospel of John - Day 3</Text>
-          <View style={styles.planProgressBar}>
-            <View style={[styles.planProgressFill, { width: '30%' }]} />
-          </View>
-          <Text style={styles.planProgress}>3 of 10 days completed</Text>
-        </Card>
+        {activePlan && (
+          <TouchableOpacity
+            onPress={() => {
+              navigation.navigate('BibleReading', {
+                readingPlan: {
+                  plan_type: activePlan.plan_type,
+                  current_day: activePlan.current_day,
+                  total_days: activePlan.total_days,
+                  title: activePlan.title,
+                },
+              });
+            }}
+            activeOpacity={0.7}
+          >
+            <Card style={styles.planCard}>
+              <View style={styles.planHeader}>
+                <Text style={styles.planTitle}>Active Reading Plan</Text>
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.primary.royalBlue} />
+              </View>
+              <Text style={styles.planName}>
+                {activePlan.title} - Day {activePlan.current_day + 1}
+              </Text>
+              <View style={styles.planProgressBar}>
+                <View
+                  style={[
+                    styles.planProgressFill,
+                    { width: `${((activePlan.current_day + 1) / activePlan.total_days) * 100}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.planProgress}>
+                {activePlan.current_day + 1} of {activePlan.total_days} days completed
+              </Text>
+            </Card>
+          </TouchableOpacity>
+        )}
       </Animated.View>
     </ScrollView>
   );
