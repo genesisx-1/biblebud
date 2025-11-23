@@ -749,14 +749,51 @@ export const getUserAchievements = async (userId) => {
   }
 };
 
-export const addAchievement = async (userId, achievementType) => {
+export const addAchievement = async (userId, achievementType, title, description) => {
   try {
+    // Check if achievement already exists
+    const { data: existing } = await supabase
+      .from('achievements')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('achievement_type', achievementType)
+      .single();
+    
+    if (existing) {
+      // Already earned
+      return { data: existing, error: null, alreadyEarned: true };
+    }
+    
     const { data, error } = await supabase
       .from('achievements')
       .insert([
         {
           user_id: userId,
           achievement_type: achievementType,
+          title,
+          description,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null, alreadyEarned: false };
+  } catch (error) {
+    return { data: null, error };
+  }
+};
+
+// Quiz Results
+export const saveQuizResult = async (userId, score, totalQuestions) => {
+  try {
+    const { data, error } = await supabase
+      .from('quiz_results')
+      .insert([
+        {
+          user_id: userId,
+          score,
+          total_questions: totalQuestions,
         },
       ])
       .select()
@@ -764,6 +801,144 @@ export const addAchievement = async (userId, achievementType) => {
 
     if (error) throw error;
     return { data, error: null };
+  } catch (error) {
+    return { data, null, error };
+  }
+};
+
+export const getUserQuizResults = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('quiz_results')
+      .select('*')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false });
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+};
+
+export const getUserQuizStats = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('quiz_results')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return {
+        data: {
+          totalQuizzes: 0,
+          averageScore: 0,
+          bestScore: 0,
+          perfectScores: 0,
+        },
+        error: null,
+      };
+    }
+    
+    const totalQuizzes = data.length;
+    const averageScore = Math.round(
+      data.reduce((sum, result) => sum + (result.score / result.total_questions) * 100, 0) / totalQuizzes
+    );
+    const bestScore = Math.max(
+      ...data.map(result => (result.score / result.total_questions) * 100)
+    );
+    const perfectScores = data.filter(
+      result => result.score === result.total_questions
+    ).length;
+    
+    return {
+      data: {
+        totalQuizzes,
+        averageScore,
+        bestScore: Math.round(bestScore),
+        perfectScores,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return { data: null, error };
+  }
+};
+
+// Daily Progress Tracking
+export const updateDailyProgress = async (userId, date, updates) => {
+  try {
+    // Try to update existing record
+    const { data: existing } = await supabase
+      .from('daily_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .single();
+    
+    if (existing) {
+      // Update existing
+      const { data, error } = await supabase
+        .from('daily_progress')
+        .update(updates)
+        .eq('id', existing.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data, error: null };
+    } else {
+      // Insert new
+      const { data, error } = await supabase
+        .from('daily_progress')
+        .insert([
+          {
+            user_id: userId,
+            date,
+            ...updates,
+          },
+        ])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data, error: null };
+    }
+  } catch (error) {
+    return { data: null, error };
+  }
+};
+
+// Get user stats (for profile)
+export const getUserStats = async (userId) => {
+  try {
+    // Get reading plans count
+    const { data: plans } = await supabase
+      .from('reading_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .not('completed_at', 'is', null);
+    
+    // Get conversations count
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('user_id', userId);
+    
+    // Get quiz stats
+    const { data: quizStats } = await getUserQuizStats(userId);
+    
+    return {
+      data: {
+        plansCompleted: plans?.length || 0,
+        conversationsCount: conversations?.length || 0,
+        quizzesTaken: quizStats?.totalQuizzes || 0,
+        quizAverageScore: quizStats?.averageScore || 0,
+      },
+      error: null,
+    };
   } catch (error) {
     return { data: null, error };
   }
