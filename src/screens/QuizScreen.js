@@ -12,7 +12,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button } from '../components';
-import { getQuizQuestions, getQuizQuestionsByBook, getQuizQuestionsByChapter } from '../services/supabase';
+import { getQuizQuestions, getQuizQuestionsByBook, getQuizQuestionsByChapter, saveQuizResult, addAchievement } from '../services/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { ACHIEVEMENT_TYPES, getAchievement } from '../constants/achievements';
 import theme from '../constants/theme';
 
 const QUIZ_MODES = {
@@ -38,6 +40,7 @@ const POPULAR_BOOKS = [
 ];
 
 const QuizScreen = ({ route }) => {
+  const { user } = useAuth();
   const [mode, setMode] = useState(QUIZ_MODES.RANDOM);
   const [selectedBook, setSelectedBook] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
@@ -52,6 +55,8 @@ const QuizScreen = ({ route }) => {
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const [resultsSaved, setResultsSaved] = useState(false);
+  const [newAchievements, setNewAchievements] = useState([]);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const celebrationAnim = useRef(new Animated.Value(0)).current;
@@ -148,6 +153,8 @@ const QuizScreen = ({ route }) => {
     setIsAnswered(false);
     setScore(0);
     setShowResults(false);
+    setResultsSaved(false);
+    setNewAchievements([]);
     loadQuestions();
   };
 
@@ -211,7 +218,7 @@ const QuizScreen = ({ route }) => {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentQuestion < questions.length - 1) {
       Animated.sequence([
         Animated.timing(fadeAnim, {
@@ -230,7 +237,52 @@ const QuizScreen = ({ route }) => {
       setSelectedAnswer(null);
       setIsAnswered(false);
     } else {
+      // Quiz finished - save results and check achievements
       setShowResults(true);
+      await saveResults();
+    }
+  };
+
+  const saveResults = async () => {
+    if (!user || resultsSaved) return;
+    
+    try {
+      // Save quiz result
+      await saveQuizResult(user.id, score, questions.length);
+      setResultsSaved(true);
+      
+      // Check and award achievements
+      const earnedAchievements = [];
+      
+      // Perfect score achievement
+      if (score === questions.length) {
+        const achievement = getAchievement(ACHIEVEMENT_TYPES.QUIZ_PERFECT);
+        const { alreadyEarned } = await addAchievement(
+          user.id,
+          achievement.id,
+          achievement.title,
+          achievement.description
+        );
+        if (!alreadyEarned) {
+          earnedAchievements.push(achievement);
+        }
+      }
+      
+      // First quiz achievement
+      const firstQuizAchievement = getAchievement(ACHIEVEMENT_TYPES.FIRST_QUIZ);
+      const { alreadyEarned: firstQuizEarned } = await addAchievement(
+        user.id,
+        firstQuizAchievement.id,
+        firstQuizAchievement.title,
+        firstQuizAchievement.description
+      );
+      if (!firstQuizEarned) {
+        earnedAchievements.push(firstQuizAchievement);
+      }
+      
+      setNewAchievements(earnedAchievements);
+    } catch (error) {
+      console.error('Error saving quiz results:', error);
     }
   };
 
@@ -264,6 +316,22 @@ const QuizScreen = ({ route }) => {
                 {mode === QUIZ_MODES.CHAPTER && `${selectedBook} ${selectedChapter}`}
                 {mode === QUIZ_MODES.BOOK && selectedBook}
               </Text>
+            )}
+
+            {/* New Achievements Earned */}
+            {newAchievements.length > 0 && (
+              <View style={styles.achievementsContainer}>
+                <Text style={styles.achievementsTitle}>New Achievements! 🎉</Text>
+                {newAchievements.map((achievement, index) => (
+                  <View key={index} style={styles.achievementBadge}>
+                    <Ionicons name={achievement.icon} size={24} color={achievement.color} />
+                    <View style={styles.achievementText}>
+                      <Text style={styles.achievementName}>{achievement.title}</Text>
+                      <Text style={styles.achievementDesc}>{achievement.description}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
             )}
 
             <View style={styles.resultsButtons}>
@@ -611,6 +679,41 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text.secondary,
     fontStyle: 'italic',
+  },
+  achievementsContainer: {
+    width: '100%',
+    marginTop: theme.spacing.lg,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background.lightGold,
+    borderRadius: theme.borderRadius.md,
+  },
+  achievementsTitle: {
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  achievementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.primary.pureWhite,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  achievementText: {
+    flex: 1,
+  },
+  achievementName: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.text.primary,
+  },
+  achievementDesc: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
   },
   resultsButtons: {
     flexDirection: 'row',
