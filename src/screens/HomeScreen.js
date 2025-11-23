@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, StreakCounter, ProgressCircle } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { getProfile, getDailyVerse, getDailyProgress, getReadingPlans } from '../services/supabase';
+import { getProfile, getUserDailyVerse, getDailyProgress, getReadingPlans } from '../services/supabase';
 import { speak } from '../services/tts';
 import { getGreeting, getTodayDate } from '../utils/dateUtils';
 import theme from '../constants/theme';
@@ -53,12 +53,11 @@ const HomeScreen = ({ navigation }) => {
     const { data: profileData } = await getProfile(user.id);
     setProfile(profileData);
 
-    // Load daily verse (mock data for now)
-    setDailyVerse({
-      verse_text: "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope.",
-      verse_reference: "Jeremiah 29:11",
-      theme: "Hope & Purpose",
-    });
+    // Load personalized daily verse (unique per user, changes daily)
+    const { data: verseData } = await getUserDailyVerse(user.id, profileData?.bible_translation || 'NIV');
+    if (verseData) {
+      setDailyVerse(verseData);
+    }
 
     // Load today's progress
     const { data: progressData } = await getDailyProgress(user.id, getTodayDate());
