@@ -1162,6 +1162,75 @@ export const getBibleVerse = async (book, chapter, verse, version = 'NIV') => {
   }
 };
 
+// Get entire Bible chapter for continuous reading
+export const getBibleChapter = async (book, chapter, version = 'NIV') => {
+  try {
+    // Using bible-api.com (free, no key required)
+    // Format: book+chapter (e.g., john+3) - fetches entire chapter
+    let bookName = book.toLowerCase();
+
+    // Handle special cases for book names
+    const bookMap = {
+      '1 corinthians': '1corinthians',
+      '2 corinthians': '2corinthians',
+      '1 peter': '1peter',
+      '2 peter': '2peter',
+      '1 john': '1john',
+      '2 john': '2john',
+      '3 john': '3john',
+      '1 timothy': '1timothy',
+      '2 timothy': '2timothy',
+      '1 thessalonians': '1thessalonians',
+      '2 thessalonians': '2thessalonians',
+      'psalm': 'psalms',
+    };
+
+    if (bookMap[bookName]) {
+      bookName = bookMap[bookName];
+    } else {
+      bookName = bookName.replace(/\s+/g, '');
+    }
+
+    const url = `https://bible-api.com/${bookName}+${chapter}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.verses) {
+        // Format verses with verse numbers
+        const formattedText = data.verses
+          .map(v => `${v.verse} ${v.text}`)
+          .join('\n\n');
+
+        return {
+          data: {
+            text: formattedText,
+            reference: data.reference || `${book} ${chapter}`,
+            verses: data.verses,
+          },
+          error: null,
+        };
+      }
+    }
+
+    return {
+      data: null,
+      error: 'Could not load chapter. Please try again.',
+    };
+  } catch (error) {
+    console.error('Error fetching Bible chapter:', error);
+    return {
+      data: null,
+      error: 'Could not load chapter. Please check your connection.',
+    };
+  }
+};
+
 // Get reading plan verse based on plan type and day
 export const getReadingPlanVerse = (planType, day, version = 'NIV') => {
   // Map plan types to Bible verses
