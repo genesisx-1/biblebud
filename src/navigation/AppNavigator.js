@@ -32,6 +32,7 @@ const HomeStack = () => {
         component={BibleReadingScreen}
         options={{
           title: 'Today\'s Reading',
+          headerBackTitle: '',
           headerStyle: {
             backgroundColor: theme.colors.primary.royalBlue,
           },
