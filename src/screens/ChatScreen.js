@@ -219,39 +219,17 @@ const ChatScreen = () => {
   // Message component - must be a proper React component to use hooks
   const MessageItem = React.memo(({ item, onSpeak, isSpeaking }) => {
     const isUser = item.role === 'user';
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(20)).current;
-
-    useEffect(() => {
-      // Animate message entrance
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, []);
 
     return (
-      <Animated.View
+      <View
         style={[
           styles.messageContainer,
           isUser ? styles.userMessageContainer : styles.assistantMessageContainer,
-          { 
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
         ]}
       >
         {!isUser && (
           <View style={styles.assistantAvatar}>
-            <Ionicons name="cross" size={20} color={theme.colors.primary.pureWhite} />
+            <Ionicons name="add" size={24} color={theme.colors.primary.pureWhite} style={{ transform: [{ rotate: '45deg' }] }} />
           </View>
         )}
 
@@ -290,11 +268,11 @@ const ChatScreen = () => {
             <Ionicons name="person" size={20} color={theme.colors.primary.pureWhite} />
           </View>
         )}
-      </Animated.View>
+      </View>
     );
   });
 
-  const renderMessage = ({ item }) => {
+  const renderMessage = React.useCallback(({ item }) => {
     return (
       <MessageItem
         item={item}
@@ -302,7 +280,9 @@ const ChatScreen = () => {
         isSpeaking={speakingMessageId === item.id}
       />
     );
-  };
+  }, [handleSpeak, speakingMessageId]);
+
+  const keyExtractor = React.useCallback((item) => item.id.toString(), []);
 
   return (
     <View style={styles.container}>
@@ -310,7 +290,7 @@ const ChatScreen = () => {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.messagesList}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -329,7 +309,7 @@ const ChatScreen = () => {
       {loading && (
         <View style={styles.typingIndicator}>
           <View style={styles.typingAvatar}>
-            <Ionicons name="cross" size={16} color={theme.colors.primary.pureWhite} />
+            <Ionicons name="add" size={20} color={theme.colors.primary.pureWhite} style={{ transform: [{ rotate: '45deg' }] }} />
           </View>
           <View style={styles.typingBubble}>
             <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot1 }] }]} />
