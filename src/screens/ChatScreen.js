@@ -28,10 +28,53 @@ const ChatScreen = () => {
   const [userName, setUserName] = useState(null);
 
   const flatListRef = useRef(null);
+  const typingDot1 = useRef(new Animated.Value(0)).current;
+  const typingDot2 = useRef(new Animated.Value(0)).current;
+  const typingDot3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     initializeConversation();
   }, [user]);
+
+  // Animate typing indicator dots
+  useEffect(() => {
+    if (loading) {
+      const animateDot = (dot, delay) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(dot, {
+              toValue: -8,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot, {
+              toValue: 0,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const dot1Anim = animateDot(typingDot1, 0);
+      const dot2Anim = animateDot(typingDot2, 150);
+      const dot3Anim = animateDot(typingDot3, 300);
+
+      dot1Anim.start();
+      dot2Anim.start();
+      dot3Anim.start();
+
+      return () => {
+        dot1Anim.stop();
+        dot2Anim.stop();
+        dot3Anim.stop();
+        typingDot1.setValue(0);
+        typingDot2.setValue(0);
+        typingDot3.setValue(0);
+      };
+    }
+  }, [loading]);
 
   const initializeConversation = async () => {
     if (!user) return;
@@ -174,13 +217,25 @@ const ChatScreen = () => {
   };
 
   // Message component - must be a proper React component to use hooks
-  const MessageItem = ({ item, onSpeak, isSpeaking }) => {
+  const MessageItem = React.memo(({ item, onSpeak, isSpeaking }) => {
     const isUser = item.role === 'user';
-    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
 
     useEffect(() => {
-      // Only animate on mount, not on every render
-      scaleAnim.setValue(1);
+      // Animate message entrance
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }, []);
 
     return (
@@ -188,12 +243,15 @@ const ChatScreen = () => {
         style={[
           styles.messageContainer,
           isUser ? styles.userMessageContainer : styles.assistantMessageContainer,
-          { transform: [{ scale: scaleAnim }] },
+          { 
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
         ]}
       >
         {!isUser && (
           <View style={styles.assistantAvatar}>
-            <Ionicons name="book" size={20} color={theme.colors.primary.pureWhite} />
+            <Ionicons name="cross" size={20} color={theme.colors.primary.pureWhite} />
           </View>
         )}
 
@@ -234,7 +292,7 @@ const ChatScreen = () => {
         )}
       </Animated.View>
     );
-  };
+  });
 
   const renderMessage = ({ item }) => {
     return (
@@ -257,13 +315,27 @@ const ChatScreen = () => {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={true}
+        removeClippedSubviews={false}
+        windowSize={10}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={20}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
       />
 
       {loading && (
         <View style={styles.typingIndicator}>
-          <View style={styles.typingDot} />
-          <View style={styles.typingDot} />
-          <View style={styles.typingDot} />
+          <View style={styles.typingAvatar}>
+            <Ionicons name="cross" size={16} color={theme.colors.primary.pureWhite} />
+          </View>
+          <View style={styles.typingBubble}>
+            <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot1 }] }]} />
+            <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot2 }] }]} />
+            <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot3 }] }]} />
+          </View>
         </View>
       )}
 
@@ -380,10 +452,31 @@ const styles = StyleSheet.create({
   },
   typingIndicator: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
+    alignItems: 'flex-end',
+    gap: theme.spacing.sm,
     padding: theme.spacing.md,
-    marginLeft: 52,
+    paddingLeft: theme.spacing.md,
+  },
+  typingAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primary.royalBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    borderBottomLeftRadius: 4,
+    ...theme.shadows.small,
+    minWidth: 80,
   },
   typingDot: {
     width: 8,
