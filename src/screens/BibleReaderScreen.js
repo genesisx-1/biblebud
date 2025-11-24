@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, ProgressCircle } from '../components';
-import { 
-  getBibleVerse, 
-  getDailyReadingVerse, 
-  getReadingPlanVerse, 
-  getProfile, 
+import {
+  getBibleVerse,
+  getBibleChapter,
+  getDailyReadingVerse,
+  getReadingPlanVerse,
+  getProfile,
   updateProfile,
   getReadingPlans,
   createReadingPlan,
@@ -75,6 +76,7 @@ const PLAN_TEMPLATES = [
 const READING_MODES = {
   DAILY: 'daily',
   PLAN: 'plan',
+  READ: 'read',
   MANUAL: 'manual',
 };
 
@@ -99,6 +101,10 @@ const BibleReaderScreen = ({ navigation }) => {
   const [manualChapter, setManualChapter] = useState('3');
   const [manualVerse, setManualVerse] = useState('16');
 
+  // Continuous reading state
+  const [readBook, setReadBook] = useState('John');
+  const [readChapter, setReadChapter] = useState(1);
+
   useEffect(() => {
     loadUserPreferences();
     loadUserPlans();
@@ -108,7 +114,7 @@ const BibleReaderScreen = ({ navigation }) => {
     if (selectedVersion) {
       loadContent();
     }
-  }, [selectedVersion, mode, currentDay, activePlan]);
+  }, [selectedVersion, mode, currentDay, activePlan, readBook, readChapter]);
 
   const loadUserPreferences = async () => {
     if (!user) return;
@@ -133,12 +139,14 @@ const BibleReaderScreen = ({ navigation }) => {
   const loadContent = async () => {
     setLoading(true);
     setVerseText('');
-    
+
     try {
       if (mode === READING_MODES.DAILY) {
         await loadDailyReading();
       } else if (mode === READING_MODES.PLAN && activePlan) {
         await loadReadingPlanVerse();
+      } else if (mode === READING_MODES.READ) {
+        await loadChapterReading();
       } else if (mode === READING_MODES.MANUAL) {
         await loadManualVerse();
       }
@@ -146,7 +154,7 @@ const BibleReaderScreen = ({ navigation }) => {
       console.error('Error loading content:', error);
       setVerseText('Error loading content. Please try again.');
     }
-    
+
     setLoading(false);
   };
 
@@ -204,6 +212,20 @@ const BibleReaderScreen = ({ navigation }) => {
       setVerseText(data.text);
     } else {
       setVerseText(`Read ${manualBook} ${manualChapter}:${manualVerse} in your Bible.`);
+    }
+  };
+
+  const loadChapterReading = async () => {
+    const { data, error } = await getBibleChapter(readBook, readChapter, selectedVersion);
+    if (data && data.text) {
+      setVerseData({
+        book: readBook,
+        chapter: readChapter,
+        reference: `${readBook} ${readChapter}`,
+      });
+      setVerseText(data.text);
+    } else {
+      setVerseText(error || `Could not load ${readBook} ${readChapter}. Please try again.`);
     }
   };
 
@@ -267,6 +289,16 @@ const BibleReaderScreen = ({ navigation }) => {
     }
   };
 
+  const handleNextChapter = () => {
+    setReadChapter(readChapter + 1);
+  };
+
+  const handlePreviousChapter = () => {
+    if (readChapter > 1) {
+      setReadChapter(readChapter - 1);
+    }
+  };
+
   const currentVersion = BIBLE_VERSIONS.find(v => v.code === selectedVersion) || BIBLE_VERSIONS[0];
 
   return (
@@ -297,24 +329,38 @@ const BibleReaderScreen = ({ navigation }) => {
             }
           }}
         >
-          <Ionicons 
-            name="list" 
-            size={20} 
-            color={mode === READING_MODES.PLAN ? theme.colors.primary.pureWhite : theme.colors.text.secondary} 
+          <Ionicons
+            name="list"
+            size={20}
+            color={mode === READING_MODES.PLAN ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
           />
           <Text style={[styles.modeButtonText, mode === READING_MODES.PLAN && styles.modeButtonTextActive]}>
             Plan
           </Text>
         </TouchableOpacity>
-        
+
+        <TouchableOpacity
+          style={[styles.modeButton, mode === READING_MODES.READ && styles.modeButtonActive]}
+          onPress={() => setMode(READING_MODES.READ)}
+        >
+          <Ionicons
+            name="book"
+            size={20}
+            color={mode === READING_MODES.READ ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
+          />
+          <Text style={[styles.modeButtonText, mode === READING_MODES.READ && styles.modeButtonTextActive]}>
+            Read
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.modeButton, mode === READING_MODES.MANUAL && styles.modeButtonActive]}
           onPress={() => setMode(READING_MODES.MANUAL)}
         >
-          <Ionicons 
-            name="search" 
-            size={20} 
-            color={mode === READING_MODES.MANUAL ? theme.colors.primary.pureWhite : theme.colors.text.secondary} 
+          <Ionicons
+            name="search"
+            size={20}
+            color={mode === READING_MODES.MANUAL ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
           />
           <Text style={[styles.modeButtonText, mode === READING_MODES.MANUAL && styles.modeButtonTextActive]}>
             Search
@@ -330,6 +376,7 @@ const BibleReaderScreen = ({ navigation }) => {
               <Text style={styles.headerLabel}>
                 {mode === READING_MODES.DAILY && 'Daily Reading'}
                 {mode === READING_MODES.PLAN && activePlan && `${activePlan.title} - Day ${currentDay + 1}`}
+                {mode === READING_MODES.READ && 'Bible Reading'}
                 {mode === READING_MODES.MANUAL && 'Bible Search'}
               </Text>
               {verseData?.title && (
@@ -355,6 +402,36 @@ const BibleReaderScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </Card>
+
+        {/* Continuous Reading Book/Chapter Selector */}
+        {mode === READING_MODES.READ && (
+          <Card style={styles.searchCard}>
+            <Text style={styles.searchLabel}>Select Book & Chapter:</Text>
+            <View style={styles.searchInputs}>
+              <TextInput
+                style={[styles.searchInput, styles.searchInputBook]}
+                value={readBook}
+                onChangeText={setReadBook}
+                placeholder="Book (e.g., John)"
+                placeholderTextColor={theme.colors.text.light}
+              />
+              <TextInput
+                style={styles.searchInput}
+                value={String(readChapter)}
+                onChangeText={(text) => setReadChapter(parseInt(text) || 1)}
+                placeholder="Ch"
+                keyboardType="numeric"
+                placeholderTextColor={theme.colors.text.light}
+              />
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={loadChapterReading}
+              >
+                <Ionicons name="book-outline" size={20} color={theme.colors.primary.pureWhite} />
+              </TouchableOpacity>
+            </View>
+          </Card>
+        )}
 
         {/* Manual Search Input */}
         {mode === READING_MODES.MANUAL && (
@@ -384,7 +461,7 @@ const BibleReaderScreen = ({ navigation }) => {
                 keyboardType="numeric"
                 placeholderTextColor={theme.colors.text.light}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.searchButton}
                 onPress={loadManualVerse}
               >
@@ -426,6 +503,24 @@ const BibleReaderScreen = ({ navigation }) => {
             icon={<Ionicons name="trophy" size={20} color={theme.colors.primary.royalBlue} />}
             style={styles.testKnowledgeButton}
           />
+        )}
+
+        {/* Navigation for Continuous Reading */}
+        {mode === READING_MODES.READ && !loading && (
+          <View style={styles.navigationButtons}>
+            <Button
+              title="◀ Previous Chapter"
+              onPress={handlePreviousChapter}
+              disabled={readChapter === 1}
+              variant="outline"
+              style={styles.navButton}
+            />
+            <Button
+              title="Next Chapter ▶"
+              onPress={handleNextChapter}
+              style={styles.navButton}
+            />
+          </View>
         )}
 
         {/* Navigation for Reading Plan */}
