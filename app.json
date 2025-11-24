@@ -15,7 +15,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.biblebro.app",
-      "buildNumber": "1.0.0",
       "icon": "./assets/icon.png",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Bible Bro needs access to your microphone for voice input during Bible study.",
@@ -42,5 +41,10 @@
     "plugins": [
       "expo-font"
     ],
+    "extra": {
+      "eas": {
+        "projectId": "ed4e1e8e-3be3-4182-a827-de090a8f4810"
+      }
+    }
   }
 }
