@@ -38,11 +38,11 @@ const HomeStack = () => {
           headerTintColor: theme.colors.primary.pureWhite,
         }}
       />
-      <Stack.Screen
-        name="Chat"
+      <Stack.Screen 
+        name="Chat" 
         component={ChatScreen}
         options={{
-          title: 'Bible Chat',
+          title: 'Bible Bro',
           headerBackTitle: '',
           headerStyle: {
             backgroundColor: theme.colors.primary.royalBlue,

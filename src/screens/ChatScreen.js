@@ -229,7 +229,7 @@ const ChatScreen = () => {
       >
         {!isUser && (
           <View style={styles.assistantAvatar}>
-            <Ionicons name="add" size={24} color={theme.colors.primary.pureWhite} style={{ transform: [{ rotate: '45deg' }] }} />
+            <Ionicons name="person" size={20} color={theme.colors.primary.pureWhite} />
           </View>
         )}
 
@@ -309,7 +309,7 @@ const ChatScreen = () => {
       {loading && (
         <View style={styles.typingIndicator}>
           <View style={styles.typingAvatar}>
-            <Ionicons name="add" size={20} color={theme.colors.primary.pureWhite} style={{ transform: [{ rotate: '45deg' }] }} />
+            <Ionicons name="person" size={18} color={theme.colors.primary.pureWhite} />
           </View>
           <View style={styles.typingBubble}>
             <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot1 }] }]} />
