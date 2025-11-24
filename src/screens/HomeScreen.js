@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, StreakCounter, ProgressCircle } from '../components';
 import { useAuth } from '../hooks/useAuth';
 import { getProfile, getUserDailyVerse, getDailyProgress, getReadingPlans } from '../services/supabase';
-import { speak } from '../services/tts';
+import * as Speech from '../services/tts';
 import { getGreeting, getTodayDate } from '../utils/dateUtils';
 import theme from '../constants/theme';
 
@@ -114,15 +114,21 @@ const HomeScreen = ({ navigation }) => {
   const handleSpeakVerse = async () => {
     if (isSpeaking) {
       setIsSpeaking(false);
-      await speak.stop();
+      await Speech.stop();
     } else {
       setIsSpeaking(true);
-      await speak.speak(
-        `${dailyVerse.verse_text}. ${dailyVerse.verse_reference}`,
-        {
-          onDone: () => setIsSpeaking(false),
-        }
-      );
+      try {
+        await Speech.speak(
+          `${dailyVerse.verse_text}. ${dailyVerse.verse_reference}`,
+          {
+            onDone: () => setIsSpeaking(false),
+            onError: () => setIsSpeaking(false),
+          }
+        );
+      } catch (error) {
+        console.error('Error speaking verse:', error);
+        setIsSpeaking(false);
+      }
     }
   };
 
