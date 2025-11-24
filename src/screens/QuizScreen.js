@@ -60,6 +60,9 @@ const QuizScreen = ({ route }) => {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const celebrationAnim = useRef(new Animated.Value(0)).current;
+  const optionAnimations = useRef(
+    Array(4).fill(0).map(() => new Animated.Value(1))
+  ).current;
 
   // Check if quiz was launched from reading screen
   useEffect(() => {
@@ -193,7 +196,7 @@ const QuizScreen = ({ route }) => {
   const question = questions[currentQuestion];
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
-  const handleSelectAnswer = (answer) => {
+  const handleSelectAnswer = (answer, answerIndex) => {
     if (isAnswered) return;
 
     setSelectedAnswer(answer);
@@ -201,17 +204,57 @@ const QuizScreen = ({ route }) => {
 
     const isCorrect = answer === question.correct_answer;
 
+    // Animate the selected option with a bounce/shake effect
+    Animated.sequence([
+      Animated.timing(optionAnimations[answerIndex], {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(optionAnimations[answerIndex], {
+        toValue: 1,
+        friction: 3,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     if (isCorrect) {
       setScore(score + 1);
+      // Celebration animation for correct answer
       Animated.sequence([
         Animated.timing(celebrationAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 400,
           useNativeDriver: true,
         }),
         Animated.timing(celebrationAnim, {
           toValue: 0,
           duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Shake animation for incorrect answer
+      Animated.sequence([
+        Animated.timing(optionAnimations[answerIndex], {
+          toValue: 1.05,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(optionAnimations[answerIndex], {
+          toValue: 0.95,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(optionAnimations[answerIndex], {
+          toValue: 1.03,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(optionAnimations[answerIndex], {
+          toValue: 1,
+          duration: 50,
           useNativeDriver: true,
         }),
       ]).start();
@@ -232,6 +275,9 @@ const QuizScreen = ({ route }) => {
           useNativeDriver: true,
         }),
       ]).start();
+
+      // Reset option animations for next question
+      optionAnimations.forEach(anim => anim.setValue(1));
 
       setCurrentQuestion(currentQuestion + 1);
       setSelectedAnswer(null);
@@ -391,31 +437,37 @@ const QuizScreen = ({ route }) => {
               const showIncorrect = isAnswered && isSelected && !isCorrect;
 
               return (
-                <TouchableOpacity
+                <Animated.View
                   key={index}
-                  style={[
-                    styles.optionButton,
-                    showCorrect && styles.optionButtonCorrect,
-                    showIncorrect && styles.optionButtonIncorrect,
-                  ]}
-                  onPress={() => handleSelectAnswer(option)}
-                  disabled={isAnswered}
+                  style={{
+                    transform: [{ scale: optionAnimations[index] }],
+                  }}
                 >
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.optionText,
-                      (showCorrect || showIncorrect) && styles.optionTextBold,
+                      styles.optionButton,
+                      showCorrect && styles.optionButtonCorrect,
+                      showIncorrect && styles.optionButtonIncorrect,
                     ]}
+                    onPress={() => handleSelectAnswer(option, index)}
+                    disabled={isAnswered}
                   >
-                    {option}
-                  </Text>
-                  {showCorrect && (
-                    <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
-                  )}
-                  {showIncorrect && (
-                    <Ionicons name="close-circle" size={24} color={theme.colors.error} />
-                  )}
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        (showCorrect || showIncorrect) && styles.optionTextBold,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                    {showCorrect && (
+                      <Ionicons name="checkmark-circle" size={28} color="#22c55e" />
+                    )}
+                    {showIncorrect && (
+                      <Ionicons name="close-circle" size={28} color="#ef4444" />
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
           </View>
@@ -608,14 +660,17 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     borderWidth: 2,
     borderColor: theme.colors.border.light,
+    ...theme.shadows.small,
   },
   optionButtonCorrect: {
-    borderColor: theme.colors.success,
-    backgroundColor: theme.colors.success + '20',
+    borderColor: '#22c55e',
+    backgroundColor: '#22c55e' + '30',
+    borderWidth: 3,
   },
   optionButtonIncorrect: {
-    borderColor: theme.colors.error,
-    backgroundColor: theme.colors.error + '20',
+    borderColor: '#ef4444',
+    backgroundColor: '#ef4444' + '30',
+    borderWidth: 3,
   },
   optionText: {
     flex: 1,
