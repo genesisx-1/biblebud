@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, LoadingSpinner } from '../components';
 import { useAuth } from '../hooks/useAuth';
 import { chatWithAI, createConversation, getMessages, getConversations, getProfile } from '../services/supabase';
-import { speak } from '../services/tts';
+import * as Speech from '../services/tts';
 import theme from '../constants/theme';
 
 const ChatScreen = () => {
@@ -207,11 +207,11 @@ const ChatScreen = () => {
   const handleSpeak = React.useCallback(async (message) => {
     if (speakingMessageId === message.id) {
       setSpeakingMessageId(null);
-      await speak.stop();
+      await Speech.stop();
     } else {
       setSpeakingMessageId(message.id);
       try {
-        await speak.speak(message.content, {
+        await Speech.speak(message.content, {
           onDone: () => setSpeakingMessageId(null),
           onError: () => setSpeakingMessageId(null),
         });
