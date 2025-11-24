@@ -16,8 +16,9 @@ export const speak = async (text, options = {}) => {
 
     Speech.speak(text, {
       language: 'en-US',
-      pitch: 1.0,
+      pitch: 0.85, // Lower pitch for male voice
       rate: 0.9,
+      voice: 'com.apple.ttsbundle.siri.voice.en-US.CKMale', // Male voice identifier for iOS
       ...options,
       onDone: () => {
         isSpeaking = false;
