@@ -1,9 +1,11 @@
 import theme from './theme';
+import { EXTENDED_READING_PLANS } from './readingPlansExtended';
+import { EXTENDED_READING_PLANS_2 } from './readingPlansExtended2';
 
 // Comprehensive Reading Plans Data
 // Each plan includes metadata and daily verse references
 
-export const READING_PLANS = [
+export const BASE_READING_PLANS = [
   // ===== GOSPEL STUDIES =====
   {
     id: 1,
@@ -683,24 +685,29 @@ export const READING_PLANS = [
     ],
   },
 
-  // Continue with more categories...
-  // I'll add more themed plans to reach 100+
+];
+
+// Combine all plans (100+ total plans)
+export const ALL_READING_PLANS = [
+  ...BASE_READING_PLANS,
+  ...EXTENDED_READING_PLANS,
+  ...EXTENDED_READING_PLANS_2
 ];
 
 // Helper function to get plan by type
 export const getPlanByType = (planType) => {
-  return READING_PLANS.find(plan => plan.plan_type === planType);
+  return ALL_READING_PLANS.find(plan => plan.plan_type === planType);
 };
 
 // Helper function to get plans by category
 export const getPlansByCategory = (category) => {
-  if (!category) return READING_PLANS;
-  return READING_PLANS.filter(plan => plan.category === category);
+  if (!category) return ALL_READING_PLANS;
+  return ALL_READING_PLANS.filter(plan => plan.category === category);
 };
 
 // Get all unique categories
 export const getCategories = () => {
-  const categories = [...new Set(READING_PLANS.map(plan => plan.category))];
+  const categories = [...new Set(ALL_READING_PLANS.map(plan => plan.category))];
   return categories.sort();
 };
 
@@ -712,4 +719,7 @@ export const getPlanVerse = (planType, day) => {
   }
   return plan.verses[day];
 };
+
+// Export ALL_READING_PLANS as the default READING_PLANS for backwards compatibility
+export { ALL_READING_PLANS as READING_PLANS };
 
