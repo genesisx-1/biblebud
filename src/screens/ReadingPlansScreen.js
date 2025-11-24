@@ -17,7 +17,11 @@ import { READING_PLANS, getCategories } from '../constants/readingPlans';
 const ReadingPlansScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [plans, setPlans] = useState([]);
-  const [activePlan, setActivePlan] = useState(null);
+  const [activePlans, setActivePlans] = useState([]);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [newPlanTitle, setNewPlanTitle] = useState('');
+  const successScaleAnim = React.useRef(new Animated.Value(0)).current;
+  const successOpacityAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadPlans();
@@ -29,32 +33,71 @@ const ReadingPlansScreen = ({ navigation }) => {
     const { data } = await getReadingPlans(user.id);
     setPlans(data || []);
 
-    // Find active plan
-    const active = data?.find((p) => p.is_active && !p.completed_at);
-    setActivePlan(active);
+    // Find all active plans
+    const active = data?.filter((p) => p.is_active && !p.completed_at) || [];
+    setActivePlans(active);
   };
 
-  const handleContinueReading = () => {
-    if (!activePlan || !navigation) return;
+  const handleContinueReading = (plan) => {
+    if (!plan || !navigation) return;
     
     // Navigate to Home tab, then to BibleReading screen
     navigation.navigate('Home', {
       screen: 'BibleReading',
       params: {
         readingPlan: {
-          plan_type: activePlan.plan_type,
-          current_day: activePlan.current_day,
-          total_days: activePlan.total_days,
-          title: activePlan.title,
+          plan_type: plan.plan_type,
+          current_day: plan.current_day,
+          total_days: plan.total_days,
+          title: plan.title,
         },
       },
     });
   };
 
+  const showSuccessMessage = (title) => {
+    setNewPlanTitle(title);
+    setShowSuccessAnimation(true);
+    successScaleAnim.setValue(0);
+    successOpacityAnim.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(successScaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(successOpacityAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Hide after 2.5 seconds
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(successScaleAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(successOpacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowSuccessAnimation(false);
+      });
+    }, 2500);
+  };
+
   const handleStartPlan = async (template) => {
     if (!user) return;
 
-    const { data} = await createReadingPlan(user.id, {
+    const { data } = await createReadingPlan(user.id, {
       plan_type: template.plan_type,
       title: template.title,
       description: template.description,
@@ -64,7 +107,13 @@ const ReadingPlansScreen = ({ navigation }) => {
     });
 
     if (data) {
-      loadPlans();
+      await loadPlans();
+      showSuccessMessage(template.title);
+      
+      // Navigate to reading after a short delay
+      setTimeout(() => {
+        handleContinueReading(data);
+      }, 1500);
     }
   };
 
@@ -74,80 +123,112 @@ const ReadingPlansScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Active Plan */}
-      {activePlan && (
-        <Card style={styles.activePlanCard} variant="lightBlue">
-          <View style={styles.activePlanHeader}>
-            <View style={styles.activePlanInfo}>
-              <Text style={styles.activePlanLabel}>Active Plan</Text>
-              <Text style={styles.activePlanTitle}>{activePlan.title}</Text>
-              <Text style={styles.activePlanDays}>
-                Day {activePlan.current_day} of {activePlan.total_days}
-              </Text>
-            </View>
-
-            <ProgressCircle
-              progress={getProgress(activePlan)}
-              size={80}
-              strokeWidth={8}
-              color={theme.colors.secondary.sageGreen}
-            >
-              <Text style={styles.progressText}>
-                {Math.round(getProgress(activePlan))}%
-              </Text>
-            </ProgressCircle>
-          </View>
-
-          <Button
-            title="Continue Reading"
-            onPress={handleContinueReading}
-            style={styles.continueButton}
-            icon={<Ionicons name="book-outline" size={20} color={theme.colors.primary.pureWhite} />}
-          />
-        </Card>
-      )}
-
-      {/* Available Plans */}
-      <Text style={styles.sectionTitle}>
-        {activePlan ? 'More Reading Plans' : 'Start a Reading Plan'}
-      </Text>
-      <Text style={styles.planCount}>{READING_PLANS.length}+ Reading Plans Available</Text>
-
-      {READING_PLANS.map((template) => (
-        <PlanCard
-          key={template.id}
-          template={template}
-          onStart={() => handleStartPlan(template)}
-        />
-      ))}
-
-      {/* Completed Plans */}
-      {plans.filter((p) => p.completed_at).length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Completed Plans</Text>
-          {plans
-            .filter((p) => p.completed_at)
-            .map((plan) => (
-              <Card key={plan.id} style={styles.completedPlan}>
-                <View style={styles.completedPlanHeader}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={32}
-                    color={theme.colors.secondary.sageGreen}
-                  />
-                  <View style={styles.completedPlanInfo}>
-                    <Text style={styles.completedPlanTitle}>{plan.title}</Text>
-                    <Text style={styles.completedPlanDate}>
-                      Completed {new Date(plan.completed_at).toLocaleDateString()}
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Active Plans Section */}
+        {activePlans.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>
+              {activePlans.length === 1 ? 'Active Plan' : 'Active Plans'}
+            </Text>
+            {activePlans.map((plan) => (
+              <Card key={plan.id} style={styles.activePlanCard} variant="lightBlue">
+                <View style={styles.activePlanHeader}>
+                  <View style={styles.activePlanInfo}>
+                    <Text style={styles.activePlanTitle}>{plan.title}</Text>
+                    <Text style={styles.activePlanDays}>
+                      Day {plan.current_day} of {plan.total_days}
                     </Text>
                   </View>
+
+                  <ProgressCircle
+                    progress={getProgress(plan)}
+                    size={70}
+                    strokeWidth={7}
+                    color={theme.colors.secondary.sageGreen}
+                  >
+                    <Text style={styles.progressText}>
+                      {Math.round(getProgress(plan))}%
+                    </Text>
+                  </ProgressCircle>
                 </View>
+
+                <Button
+                  title="Continue Reading"
+                  onPress={() => handleContinueReading(plan)}
+                  style={styles.continueButton}
+                  icon={<Ionicons name="book-outline" size={20} color={theme.colors.primary.pureWhite} />}
+                />
               </Card>
             ))}
-        </>
+          </>
+        )}
+
+        {/* Available Plans */}
+        <Text style={styles.sectionTitle}>
+          {activePlans.length > 0 ? 'More Reading Plans' : 'Start a Reading Plan'}
+        </Text>
+        <Text style={styles.planCount}>{READING_PLANS.length} Reading Plans Available</Text>
+
+        {READING_PLANS.map((template) => (
+          <PlanCard
+            key={template.id}
+            template={template}
+            onStart={() => handleStartPlan(template)}
+          />
+        ))}
+
+        {/* Completed Plans */}
+        {plans.filter((p) => p.completed_at).length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Completed Plans</Text>
+            {plans
+              .filter((p) => p.completed_at)
+              .map((plan) => (
+                <Card key={plan.id} style={styles.completedPlan}>
+                  <View style={styles.completedPlanHeader}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={32}
+                      color={theme.colors.secondary.sageGreen}
+                    />
+                    <View style={styles.completedPlanInfo}>
+                      <Text style={styles.completedPlanTitle}>{plan.title}</Text>
+                      <Text style={styles.completedPlanDate}>
+                        Completed {new Date(plan.completed_at).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                </Card>
+              ))}
+          </>
+        )}
+      </ScrollView>
+
+      {/* Success Animation Overlay */}
+      {showSuccessAnimation && (
+        <Animated.View 
+          style={[
+            styles.successOverlay,
+            {
+              opacity: successOpacityAnim,
+              transform: [{ scale: successScaleAnim }],
+            },
+          ]}
+        >
+          <View style={styles.successCard}>
+            <Ionicons 
+              name="checkmark-circle" 
+              size={60} 
+              color={theme.colors.secondary.sageGreen} 
+            />
+            <Text style={styles.successTitle}>Plan Started!</Text>
+            <Text style={styles.successSubtitle}>{newPlanTitle}</Text>
+            <Text style={styles.successMessage}>Taking you to your reading...</Text>
+          </View>
+        </Animated.View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -210,6 +291,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: theme.spacing.md,
@@ -315,6 +399,54 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
     marginTop: theme.spacing.xs,
+  },
+  planCount: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  successOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  successCard: {
+    backgroundColor: theme.colors.primary.pureWhite,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    maxWidth: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successTitle: {
+    fontSize: theme.typography.fontSize.xxl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
+    marginTop: theme.spacing.md,
+  },
+  successSubtitle: {
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.primary.royalBlue,
+    marginTop: theme.spacing.xs,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.secondary,
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
   },
 });
 
