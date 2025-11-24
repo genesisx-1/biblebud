@@ -12,6 +12,9 @@ import QuizScreen from '../screens/QuizScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import BibleReadingScreen from '../screens/BibleReadingScreen';
 import BibleReaderScreen from '../screens/BibleReaderScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -19,13 +22,13 @@ const Stack = createStackNavigator();
 const HomeStack = () => {
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="HomeMain" 
+      <Stack.Screen
+        name="HomeMain"
         component={HomeScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="BibleReading" 
+      <Stack.Screen
+        name="BibleReading"
         component={BibleReadingScreen}
         options={{
           title: 'Today\'s Reading',
@@ -35,8 +38,8 @@ const HomeStack = () => {
           headerTintColor: theme.colors.primary.pureWhite,
         }}
       />
-      <Stack.Screen 
-        name="Chat" 
+      <Stack.Screen
+        name="Chat"
         component={ChatScreen}
         options={{
           title: 'Bible Chat',
@@ -45,6 +48,33 @@ const HomeStack = () => {
           },
           headerTintColor: theme.colors.primary.pureWhite,
         }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+const ProfileStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="ProfileMain"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TermsOfService"
+        component={TermsOfServiceScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="HelpSupport"
+        component={HelpSupportScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -124,9 +154,10 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStack}
         options={{
           title: 'Profile',
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
