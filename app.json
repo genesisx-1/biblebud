@@ -41,6 +41,6 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
   }
 }
