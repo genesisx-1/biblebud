@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 13.2.0"
+    "version": ">= 13.2.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -18,6 +19,7 @@
     },
     "production": {
       "distribution": "store",
+      "node": "18.18.0",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://zpypokphntatvxpgpdzs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpweXBva3BobnRhdHZ4cGdwZHpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1MTA2ODMsImV4cCI6MjA3OTA4NjY4M30.Y9cj7CBEWalP-XlDrDQ3__jrrMM3NCTZS5_5OGM2iqI"
