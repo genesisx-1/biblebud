@@ -204,17 +204,23 @@ const ChatScreen = () => {
     }, 50);
   };
 
-  const handleSpeak = async (message) => {
+  const handleSpeak = React.useCallback(async (message) => {
     if (speakingMessageId === message.id) {
       setSpeakingMessageId(null);
       await speak.stop();
     } else {
       setSpeakingMessageId(message.id);
-      await speak.speak(message.content, {
-        onDone: () => setSpeakingMessageId(null),
-      });
+      try {
+        await speak.speak(message.content, {
+          onDone: () => setSpeakingMessageId(null),
+          onError: () => setSpeakingMessageId(null),
+        });
+      } catch (error) {
+        console.error('Error speaking:', error);
+        setSpeakingMessageId(null);
+      }
     }
-  };
+  }, [speakingMessageId]);
 
   // Message component - must be a proper React component to use hooks
   const MessageItem = React.memo(({ item, onSpeak, isSpeaking }) => {

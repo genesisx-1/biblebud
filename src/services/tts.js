@@ -10,25 +10,34 @@ export const speak = async (text, options = {}) => {
 
     isSpeaking = true;
 
-    await Speech.speak(text, {
+    const userOnDone = options.onDone;
+    const userOnStopped = options.onStopped;
+    const userOnError = options.onError;
+
+    Speech.speak(text, {
       language: 'en-US',
       pitch: 1.0,
       rate: 0.9,
+      ...options,
       onDone: () => {
         isSpeaking = false;
+        if (userOnDone) userOnDone();
       },
       onStopped: () => {
         isSpeaking = false;
+        if (userOnStopped) userOnStopped();
       },
-      onError: () => {
+      onError: (error) => {
         isSpeaking = false;
+        console.error('Speech error:', error);
+        if (userOnError) userOnError(error);
       },
-      ...options,
     });
 
     return { success: true };
   } catch (error) {
     isSpeaking = false;
+    console.error('TTS error:', error);
     return { success: false, error };
   }
 };
