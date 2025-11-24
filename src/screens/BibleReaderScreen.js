@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, ProgressCircle } from '../components';
@@ -105,16 +106,49 @@ const BibleReaderScreen = ({ navigation }) => {
   const [readBook, setReadBook] = useState('John');
   const [readChapter, setReadChapter] = useState(1);
 
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     loadUserPreferences();
     loadUserPlans();
+
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [user]);
 
   useEffect(() => {
     if (selectedVersion) {
+      // Reset and animate content card
+      cardFadeAnim.setValue(0);
       loadContent();
     }
   }, [selectedVersion, mode, currentDay, activePlan, readBook, readChapter]);
+
+  useEffect(() => {
+    // Animate content card when verse text loads
+    if (verseText && !loading) {
+      Animated.timing(cardFadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [verseText, loading]);
 
   const loadUserPreferences = async () => {
     if (!user) return;
@@ -304,7 +338,15 @@ const BibleReaderScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Mode Selector */}
-      <View style={styles.modeSelector}>
+      <Animated.View
+        style={[
+          styles.modeSelector,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: Animated.multiply(slideAnim, -0.5) }],
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.modeButton, mode === READING_MODES.DAILY && styles.modeButtonActive]}
           onPress={() => setMode(READING_MODES.DAILY)}
@@ -366,9 +408,16 @@ const BibleReaderScreen = ({ navigation }) => {
             Search
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }}
+      >
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         {/* Header Card */}
         <Card style={styles.headerCard}>
           <View style={styles.header}>
@@ -472,22 +521,24 @@ const BibleReaderScreen = ({ navigation }) => {
         )}
 
         {/* Verse Content */}
-        <Card style={styles.verseCard}>
-          {loading ? (
-            <ActivityIndicator size="large" color={theme.colors.primary.royalBlue} />
-          ) : verseText ? (
-            <>
-              <Text style={styles.verseText}>{verseText}</Text>
-              {verseData?.reference && (
-                <Text style={styles.referenceFooter}>
-                  {verseData.reference} ({selectedVersion})
-                </Text>
-              )}
-            </>
-          ) : (
-            <Text style={styles.verseText}>No content available</Text>
-          )}
-        </Card>
+        <Animated.View style={{ opacity: cardFadeAnim }}>
+          <Card style={styles.verseCard}>
+            {loading ? (
+              <ActivityIndicator size="large" color={theme.colors.primary.royalBlue} />
+            ) : verseText ? (
+              <>
+                <Text style={styles.verseText}>{verseText}</Text>
+                {verseData?.reference && (
+                  <Text style={styles.referenceFooter}>
+                    {verseData.reference} ({selectedVersion})
+                  </Text>
+                )}
+              </>
+            ) : (
+              <Text style={styles.verseText}>No content available</Text>
+            )}
+          </Card>
+        </Animated.View>
 
         {/* Test Knowledge Button */}
         {!loading && verseData && (
@@ -563,6 +614,7 @@ const BibleReaderScreen = ({ navigation }) => {
           />
         )}
       </ScrollView>
+      </Animated.View>
 
       {/* Reading Plans Modal */}
       <Modal

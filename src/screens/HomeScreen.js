@@ -28,10 +28,16 @@ const HomeScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
+  // Staggered card animations
+  const card1Anim = useRef(new Animated.Value(0)).current;
+  const card2Anim = useRef(new Animated.Value(0)).current;
+  const card3Anim = useRef(new Animated.Value(0)).current;
+  const card4Anim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     loadData();
 
-    // Animate entrance
+    // Animate entrance with staggered cards
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -41,6 +47,34 @@ const HomeScreen = ({ navigation }) => {
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Staggered card animations
+    Animated.stagger(100, [
+      Animated.spring(card1Anim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card2Anim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card3Anim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card4Anim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
         useNativeDriver: true,
       }),
     ]).start();

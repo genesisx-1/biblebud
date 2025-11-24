@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Animated,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, Input } from '../components';
@@ -13,17 +15,35 @@ import { useAuth } from '../hooks/useAuth';
 import { getProfile, updateProfile, signOut, getUserStats } from '../services/supabase';
 import theme from '../constants/theme';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState('');
   const [bibleTranslation, setBibleTranslation] = useState('NIV');
+  const [darkMode, setDarkMode] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     loadProfile();
     loadStats();
+
+    // Animate entrance
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const loadProfile = async () => {
@@ -80,8 +100,26 @@ const ProfileScreen = () => {
     );
   };
 
+  const handleDarkModeToggle = () => {
+    setDarkMode(!darkMode);
+    Alert.alert(
+      'Dark Mode',
+      darkMode ? 'Dark mode disabled' : 'Dark mode enabled! (Coming soon with full theme support)',
+      [{ text: 'OK' }]
+    );
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
       {/* Profile Header */}
       <Card style={styles.profileCard}>
         <View style={styles.avatarContainer}>
@@ -191,13 +229,21 @@ const ProfileScreen = () => {
           <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Ionicons name="moon-outline" size={24} color={theme.colors.text.primary} />
             <Text style={styles.settingText}>Dark Mode</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
+          <Switch
+            value={darkMode}
+            onValueChange={handleDarkModeToggle}
+            trackColor={{
+              false: theme.colors.border.light,
+              true: theme.colors.primary.royalBlue,
+            }}
+            thumbColor={darkMode ? theme.colors.primary.pureWhite : theme.colors.background.secondary}
+          />
+        </View>
 
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingLeft}>
@@ -215,19 +261,34 @@ const ProfileScreen = () => {
       <Card style={styles.aboutCard}>
         <Text style={styles.aboutTitle}>About Bible Bro</Text>
 
-        <TouchableOpacity style={styles.aboutItem}>
+        <TouchableOpacity
+          style={styles.aboutItem}
+          onPress={() => navigation.navigate('HelpSupport')}
+        >
           <Ionicons name="information-circle-outline" size={24} color={theme.colors.text.primary} />
           <Text style={styles.aboutText}>Help & Support</Text>
+          <View style={{ flex: 1 }} />
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.aboutItem}>
+        <TouchableOpacity
+          style={styles.aboutItem}
+          onPress={() => navigation.navigate('TermsOfService')}
+        >
           <Ionicons name="document-text-outline" size={24} color={theme.colors.text.primary} />
           <Text style={styles.aboutText}>Terms of Service</Text>
+          <View style={{ flex: 1 }} />
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.aboutItem}>
+        <TouchableOpacity
+          style={styles.aboutItem}
+          onPress={() => navigation.navigate('PrivacyPolicy')}
+        >
           <Ionicons name="shield-checkmark-outline" size={24} color={theme.colors.text.primary} />
           <Text style={styles.aboutText}>Privacy Policy</Text>
+          <View style={{ flex: 1 }} />
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
       </Card>
 
@@ -243,11 +304,15 @@ const ProfileScreen = () => {
 
       <Text style={styles.version}>Version 1.0.0</Text>
     </ScrollView>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
