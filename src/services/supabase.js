@@ -1210,57 +1210,11 @@ export const getBibleChapter = async (book, chapter, version = 'NIV') => {
 };
 
 // Get reading plan verse based on plan type and day
+// This now uses the centralized reading plans data
 export const getReadingPlanVerse = (planType, day, version = 'NIV') => {
-  // Map plan types to Bible verses
-  const planVerses = {
-    'gospel_of_john': [
-      { book: 'John', chapter: 1, verses: '1-18', title: 'The Word Became Flesh' },
-      { book: 'John', chapter: 1, verses: '19-51', title: 'John the Baptist' },
-      { book: 'John', chapter: 2, verses: '1-25', title: 'The Wedding at Cana' },
-      { book: 'John', chapter: 3, verses: '1-21', title: 'Jesus and Nicodemus' },
-      { book: 'John', chapter: 3, verses: '22-36', title: 'John Testifies About Jesus' },
-      { book: 'John', chapter: 4, verses: '1-42', title: 'Jesus and the Samaritan Woman' },
-      { book: 'John', chapter: 4, verses: '43-54', title: 'Jesus Heals an Official\'s Son' },
-      { book: 'John', chapter: 5, verses: '1-18', title: 'Jesus Heals on the Sabbath' },
-      { book: 'John', chapter: 5, verses: '19-47', title: 'The Authority of the Son' },
-      { book: 'John', chapter: 6, verses: '1-21', title: 'Jesus Feeds the Five Thousand' },
-    ],
-    'overcoming_anxiety': [
-      { book: 'Philippians', chapter: 4, verses: '4-9', title: 'Peace of God' },
-      { book: 'Matthew', chapter: 6, verses: '25-34', title: 'Do Not Worry' },
-      { book: '1 Peter', chapter: 5, verses: '6-11', title: 'Cast Your Anxieties' },
-      { book: 'Isaiah', chapter: 41, verses: '10-13', title: 'Fear Not' },
-      { book: 'Psalm', chapter: 23, verses: '1-6', title: 'The Lord is My Shepherd' },
-      { book: 'Psalm', chapter: 46, verses: '1-11', title: 'God is Our Refuge' },
-      { book: '2 Timothy', chapter: 1, verses: '7-10', title: 'Power, Love, and Self-Discipline' },
-    ],
-    'proverbs_wisdom': [
-      { book: 'Proverbs', chapter: 1, verses: '1-7', title: 'Purpose and Theme' },
-      { book: 'Proverbs', chapter: 3, verses: '1-12', title: 'Trust in the Lord' },
-      { book: 'Proverbs', chapter: 3, verses: '13-26', title: 'Wisdom\'s Benefits' },
-      { book: 'Proverbs', chapter: 4, verses: '1-13', title: 'Get Wisdom' },
-      { book: 'Proverbs', chapter: 10, verses: '1-12', title: 'Proverbs of Solomon' },
-      { book: 'Proverbs', chapter: 16, verses: '1-9', title: 'Commit to the Lord' },
-      { book: 'Proverbs', chapter: 22, verses: '1-6', title: 'A Good Name' },
-      { book: 'Proverbs', chapter: 31, verses: '10-31', title: 'A Wife of Noble Character' },
-    ],
-    'new_believer_basics': [
-      { book: 'John', chapter: 3, verses: '1-21', title: 'Born Again' },
-      { book: 'Romans', chapter: 3, verses: '21-31', title: 'Righteousness Through Faith' },
-      { book: 'Ephesians', chapter: 2, verses: '1-10', title: 'Made Alive in Christ' },
-      { book: '1 John', chapter: 1, verses: '1-10', title: 'The Word of Life' },
-      { book: 'Romans', chapter: 8, verses: '1-17', title: 'Life Through the Spirit' },
-      { book: 'Galatians', chapter: 5, verses: '16-26', title: 'Life by the Spirit' },
-      { book: 'Matthew', chapter: 28, verses: '16-20', title: 'The Great Commission' },
-    ],
-  };
-
-  const plan = planVerses[planType];
-  if (!plan || day < 0 || day >= plan.length) {
-    return null;
-  }
-
-  return plan[day];
+  // Import the helper function from reading plans
+  const { getPlanVerse } = require('../constants/readingPlans');
+  return getPlanVerse(planType, day);
 };
 
 // Get daily verse based on date (different each day)

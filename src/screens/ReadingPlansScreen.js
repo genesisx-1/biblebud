@@ -12,41 +12,7 @@ import { Card, Button, ProgressCircle } from '../components';
 import { useAuth } from '../hooks/useAuth';
 import { getReadingPlans, createReadingPlan } from '../services/supabase';
 import theme from '../constants/theme';
-
-const PLAN_TEMPLATES = [
-  {
-    id: 1,
-    title: 'Gospel of John',
-    description: 'Explore the life and teachings of Jesus',
-    total_days: 10,
-    icon: 'book',
-    color: theme.colors.primary.royalBlue,
-  },
-  {
-    id: 2,
-    title: 'Overcoming Anxiety',
-    description: 'Find peace through scripture',
-    total_days: 7,
-    icon: 'heart',
-    color: theme.colors.secondary.sageGreen,
-  },
-  {
-    id: 3,
-    title: 'Proverbs Wisdom',
-    description: 'Daily wisdom for life',
-    total_days: 14,
-    icon: 'bulb',
-    color: theme.colors.primary.warmGold,
-  },
-  {
-    id: 4,
-    title: 'New Believer Basics',
-    description: 'Foundation for your faith journey',
-    total_days: 21,
-    icon: 'star',
-    color: theme.colors.primary.royalBlue,
-  },
-];
+import { READING_PLANS, getCategories } from '../constants/readingPlans';
 
 const ReadingPlansScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -88,8 +54,8 @@ const ReadingPlansScreen = ({ navigation }) => {
   const handleStartPlan = async (template) => {
     if (!user) return;
 
-    const { data } = await createReadingPlan(user.id, {
-      plan_type: template.title.toLowerCase().replace(/\s+/g, '_'),
+    const { data} = await createReadingPlan(user.id, {
+      plan_type: template.plan_type,
       title: template.title,
       description: template.description,
       total_days: template.total_days,
@@ -146,8 +112,9 @@ const ReadingPlansScreen = ({ navigation }) => {
       <Text style={styles.sectionTitle}>
         {activePlan ? 'More Reading Plans' : 'Start a Reading Plan'}
       </Text>
+      <Text style={styles.planCount}>{READING_PLANS.length}+ Reading Plans Available</Text>
 
-      {PLAN_TEMPLATES.map((template) => (
+      {READING_PLANS.map((template) => (
         <PlanCard
           key={template.id}
           template={template}

@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { speak } from '../services/tts';
 import theme from '../constants/theme';
+import { READING_PLANS, getPlanVerse } from '../constants/readingPlans';
 
 const BIBLE_VERSIONS = [
   { code: 'NIV', name: 'New International Version' },
@@ -33,45 +34,6 @@ const BIBLE_VERSIONS = [
   { code: 'KJV', name: 'King James Version' },
   { code: 'NLT', name: 'New Living Translation' },
   { code: 'NASB', name: 'New American Standard Bible' },
-];
-
-const PLAN_TEMPLATES = [
-  {
-    id: 1,
-    plan_type: 'gospel_of_john',
-    title: 'Gospel of John',
-    description: 'Explore the life and teachings of Jesus',
-    total_days: 10,
-    icon: 'book',
-    color: theme.colors.primary.royalBlue,
-  },
-  {
-    id: 2,
-    plan_type: 'overcoming_anxiety',
-    title: 'Overcoming Anxiety',
-    description: 'Find peace through scripture',
-    total_days: 7,
-    icon: 'heart',
-    color: theme.colors.secondary.sageGreen,
-  },
-  {
-    id: 3,
-    plan_type: 'proverbs_wisdom',
-    title: 'Proverbs Wisdom',
-    description: 'Daily wisdom for life',
-    total_days: 14,
-    icon: 'bulb',
-    color: theme.colors.primary.warmGold,
-  },
-  {
-    id: 4,
-    plan_type: 'new_believer_basics',
-    title: 'New Believer Basics',
-    description: 'Foundation for your faith journey',
-    total_days: 21,
-    icon: 'star',
-    color: theme.colors.primary.royalBlue,
-  },
 ];
 
 const READING_MODES = {
@@ -205,8 +167,8 @@ const BibleReaderScreen = ({ navigation }) => {
 
   const loadReadingPlanVerse = async () => {
     if (!activePlan) return;
-    
-    const planVerse = getReadingPlanVerse(activePlan.plan_type, currentDay, selectedVersion);
+
+    const planVerse = getPlanVerse(activePlan.plan_type, currentDay);
     
     if (!planVerse) {
       setVerseText('Reading plan content not available.');
@@ -632,7 +594,8 @@ const BibleReaderScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
             <ScrollView>
-              {PLAN_TEMPLATES.map((template) => (
+              <Text style={styles.planCount}>{READING_PLANS.length}+ Reading Plans Available</Text>
+            {READING_PLANS.map((template) => (
                 <TouchableOpacity
                   key={template.id}
                   style={styles.planOption}
