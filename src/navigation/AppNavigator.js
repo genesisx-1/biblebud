@@ -40,6 +40,7 @@ const HomeStack = () => {
         component={ChatScreen}
         options={{
           title: 'Bible Chat',
+          headerBackTitle: '',
           headerStyle: {
             backgroundColor: theme.colors.primary.royalBlue,
           },

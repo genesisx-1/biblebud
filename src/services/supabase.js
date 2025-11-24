@@ -248,40 +248,18 @@ export const updateReadingPlanProgress = async (planId, currentDay) => {
   }
 };
 
-// Daily Progress
+// Daily Progress - DEPRECATED (table removed, keeping for compatibility)
+// Progress is now tracked through quiz_results, reading_plans, and achievements
 export const getDailyProgress = async (userId, date) => {
-  try {
-    const { data, error } = await supabase
-      .from('daily_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', date)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
-    return { data, error: null };
-  } catch (error) {
-    return { data: null, error };
-  }
+  // Return null data since daily_progress table was removed
+  // Progress is tracked through other specific tables now
+  return { data: null, error: null };
 };
 
 export const updateDailyProgress = async (userId, date, progress) => {
-  try {
-    const { data, error } = await supabase
-      .from('daily_progress')
-      .upsert({
-        user_id: userId,
-        date,
-        ...progress,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return { data, error: null };
-  } catch (error) {
-    return { data: null, error };
-  }
+  // No-op since daily_progress table was removed
+  // Progress is tracked through other specific tables now
+  return { data: null, error: null };
 };
 
 // Seeded random function - same seed = same result
