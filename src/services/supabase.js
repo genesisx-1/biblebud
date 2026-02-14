@@ -263,10 +263,22 @@ export const updateDailyProgress = async (userId, date, progress) => {
   return { data: null, error: null };
 };
 
-// Seeded random function - same seed = same result
+// FNV-1a hash for strings - produces well-distributed 32-bit integers
+const fnv1aHash = (str) => {
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193); // FNV prime
+  }
+  return hash >>> 0; // Convert to unsigned 32-bit
+};
+
+// Mulberry32 PRNG - produces well-distributed values from a seed
 const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
+  let t = (seed + 0x6D2B79F5) | 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
 // Get user's personalized daily verse (different per user, changes daily)
@@ -276,15 +288,9 @@ export const getUserDailyVerse = async (userId, version = 'NIV') => {
     const today = new Date();
     const dateString = today.toISOString().split('T')[0];
     
-    // Create a unique seed from user ID + date
-    // Convert UUID to number for seeding
-    const userIdHash = userId.split('').reduce((acc, char) => {
-      return acc + char.charCodeAt(0);
-    }, 0);
-    const dateHash = dateString.split('').reduce((acc, char) => {
-      return acc + char.charCodeAt(0);
-    }, 0);
-    const seed = userIdHash + dateHash;
+    // Create a unique seed from user ID + date using FNV-1a hash
+    // This produces well-distributed values even for similar inputs
+    const seed = fnv1aHash(userId + ':' + dateString);
     
     // Large pool of popular Bible verses
     const dailyVerses = [

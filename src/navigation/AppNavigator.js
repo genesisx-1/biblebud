@@ -35,20 +35,32 @@ const HomeStack = () => {
           headerBackTitle: '',
           headerStyle: {
             backgroundColor: theme.colors.primary.royalBlue,
+            shadowColor: 'transparent',
+            elevation: 0,
           },
           headerTintColor: theme.colors.primary.pureWhite,
+          headerTitleStyle: {
+            fontWeight: theme.typography.fontWeight.semibold,
+            fontSize: theme.typography.fontSize.lg,
+          },
         }}
       />
-      <Stack.Screen 
-        name="Chat" 
+      <Stack.Screen
+        name="Chat"
         component={ChatScreen}
         options={{
           title: 'Bible Bro',
           headerBackTitle: '',
           headerStyle: {
             backgroundColor: theme.colors.primary.royalBlue,
+            shadowColor: 'transparent',
+            elevation: 0,
           },
           headerTintColor: theme.colors.primary.pureWhite,
+          headerTitleStyle: {
+            fontWeight: theme.typography.fontWeight.semibold,
+            fontSize: theme.typography.fontSize.lg,
+          },
         }}
       />
     </Stack.Navigator>
@@ -101,27 +113,33 @@ const TabNavigator = () => {
             iconName = focused ? 'person' : 'person-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={22} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary.royalBlue,
-        tabBarInactiveTintColor: theme.colors.text.secondary,
+        tabBarInactiveTintColor: theme.colors.text.light,
         tabBarStyle: {
           backgroundColor: theme.colors.background.primary,
           borderTopColor: theme.colors.border.light,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
+          borderTopWidth: 0.5,
+          paddingBottom: 6,
+          paddingTop: 6,
+          height: 56,
+          ...theme.shadows.small,
         },
         tabBarLabelStyle: {
-          fontSize: theme.typography.fontSize.xs,
+          fontSize: 11,
           fontWeight: theme.typography.fontWeight.medium,
+          marginTop: -2,
         },
         headerStyle: {
           backgroundColor: theme.colors.primary.royalBlue,
+          shadowColor: 'transparent',
+          elevation: 0,
         },
         headerTintColor: theme.colors.primary.pureWhite,
         headerTitleStyle: {
-          fontWeight: theme.typography.fontWeight.bold,
+          fontWeight: theme.typography.fontWeight.semibold,
+          fontSize: theme.typography.fontSize.lg,
         },
       })}
     >
@@ -129,7 +147,7 @@ const TabNavigator = () => {
         name="Home"
         component={HomeStack}
         options={{
-          title: 'Bible Bro',
+          title: 'Home',
           headerShown: false,
         }}
       />
@@ -137,21 +155,21 @@ const TabNavigator = () => {
         name="Bible"
         component={BibleReaderScreen}
         options={{
-          title: 'Bible Reader',
+          title: 'Bible',
         }}
       />
       <Tab.Screen
         name="Plans"
         component={ReadingPlansScreen}
         options={{
-          title: 'Reading Plans',
+          title: 'Plans',
         }}
       />
       <Tab.Screen
         name="Quiz"
         component={QuizScreen}
         options={{
-          title: 'Bible Quiz',
+          title: 'Quiz',
         }}
       />
       <Tab.Screen

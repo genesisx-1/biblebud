@@ -328,9 +328,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: theme.colors.primary.royalBlue,
     justifyContent: 'center',
     alignItems: 'center',

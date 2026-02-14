@@ -9,9 +9,10 @@ import {
   Modal,
   TextInput,
   Animated,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Card, Button, ProgressCircle } from '../components';
+import { Button, ProgressCircle } from '../components';
 import {
   getBibleVerse,
   getBibleChapter,
@@ -24,7 +25,7 @@ import {
   updateReadingPlanProgress,
 } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { speak } from '../services/tts';
+import * as Speech from '../services/tts';
 import theme from '../constants/theme';
 import { READING_PLANS, getPlanVerse } from '../constants/readingPlans';
 
@@ -52,61 +53,45 @@ const BibleReaderScreen = ({ navigation }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState('NIV');
   const [showVersionModal, setShowVersionModal] = useState(false);
-  
-  // Reading Plans state
+
   const [userPlans, setUserPlans] = useState([]);
   const [activePlan, setActivePlan] = useState(null);
   const [currentDay, setCurrentDay] = useState(0);
   const [showPlansModal, setShowPlansModal] = useState(false);
-  
-  // Manual reading state
+
   const [manualBook, setManualBook] = useState('John');
   const [manualChapter, setManualChapter] = useState('3');
   const [manualVerse, setManualVerse] = useState('16');
 
-  // Continuous reading state
   const [readBook, setReadBook] = useState('John');
   const [readChapter, setReadChapter] = useState(1);
 
-  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
   const cardFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadUserPreferences();
     loadUserPlans();
 
-    // Entrance animations
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
   }, [user]);
 
   useEffect(() => {
     if (selectedVersion) {
-      // Reset and animate content card
       cardFadeAnim.setValue(0);
       loadContent();
     }
   }, [selectedVersion, mode, currentDay, activePlan, readBook, readChapter]);
 
   useEffect(() => {
-    // Animate content card when verse text loads
     if (verseText && !loading) {
       Animated.timing(cardFadeAnim, {
         toValue: 1,
-        duration: 400,
+        duration: 300,
         useNativeDriver: true,
       }).start();
     }
@@ -124,7 +109,7 @@ const BibleReaderScreen = ({ navigation }) => {
     if (!user) return;
     const { data: plans } = await getReadingPlans(user.id);
     setUserPlans(plans || []);
-    
+
     const active = plans?.find((p) => p.is_active && !p.completed_at);
     if (active) {
       setActivePlan(active);
@@ -169,16 +154,16 @@ const BibleReaderScreen = ({ navigation }) => {
     if (!activePlan) return;
 
     const planVerse = getPlanVerse(activePlan.plan_type, currentDay);
-    
+
     if (!planVerse) {
       setVerseText('Reading plan content not available.');
       return;
     }
-    
+
     const verseParts = planVerse.verses.split('-');
     const startVerse = parseInt(verseParts[0]);
     const endVerse = verseParts[1] ? parseInt(verseParts[1]) : startVerse;
-    
+
     let fullText = '';
     for (let v = startVerse; v <= Math.min(endVerse, startVerse + 20); v++) {
       const { data } = await getBibleVerse(planVerse.book, planVerse.chapter, v, selectedVersion);
@@ -186,7 +171,7 @@ const BibleReaderScreen = ({ navigation }) => {
         fullText += `${v} ${data.text}\n\n`;
       }
     }
-    
+
     if (fullText) {
       setVerseData({
         book: planVerse.book,
@@ -236,13 +221,23 @@ const BibleReaderScreen = ({ navigation }) => {
   const handleSpeak = async () => {
     if (isSpeaking) {
       setIsSpeaking(false);
-      await speak.stop();
+      await Speech.stop();
     } else {
       setIsSpeaking(true);
       const text = `${verseData?.reference || 'Reading'}. ${verseText}`;
-      await speak.speak(text, {
+      await Speech.speak(text, {
         onDone: () => setIsSpeaking(false),
       });
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `"${verseText}"\n\n- ${verseData?.reference || 'Bible Reading'} (${selectedVersion})\n\nShared from Bible Bro`,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
     }
   };
 
@@ -269,10 +264,10 @@ const BibleReaderScreen = ({ navigation }) => {
 
   const handleNextDay = async () => {
     if (!activePlan || currentDay >= activePlan.total_days - 1) return;
-    
+
     const newDay = currentDay + 1;
     setCurrentDay(newDay);
-    
+
     if (user) {
       await updateReadingPlanProgress(activePlan.id, newDay);
       await loadUserPlans();
@@ -300,88 +295,43 @@ const BibleReaderScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Mode Selector */}
-      <Animated.View
-        style={[
-          styles.modeSelector,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(slideAnim, -0.5) }],
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.modeButton, mode === READING_MODES.DAILY && styles.modeButtonActive]}
-          onPress={() => setMode(READING_MODES.DAILY)}
-        >
-          <Ionicons 
-            name="sunny" 
-            size={20} 
-            color={mode === READING_MODES.DAILY ? theme.colors.primary.pureWhite : theme.colors.text.secondary} 
-          />
-          <Text style={[styles.modeButtonText, mode === READING_MODES.DAILY && styles.modeButtonTextActive]}>
-            Daily
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.modeButton, mode === READING_MODES.PLAN && styles.modeButtonActive]}
-          onPress={() => {
-            if (activePlan) {
-              setMode(READING_MODES.PLAN);
-            } else {
-              setShowPlansModal(true);
-            }
-          }}
-        >
-          <Ionicons
-            name="list"
-            size={20}
-            color={mode === READING_MODES.PLAN ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
-          />
-          <Text style={[styles.modeButtonText, mode === READING_MODES.PLAN && styles.modeButtonTextActive]}>
-            Plan
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modeButton, mode === READING_MODES.READ && styles.modeButtonActive]}
-          onPress={() => setMode(READING_MODES.READ)}
-        >
-          <Ionicons
-            name="book"
-            size={20}
-            color={mode === READING_MODES.READ ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
-          />
-          <Text style={[styles.modeButtonText, mode === READING_MODES.READ && styles.modeButtonTextActive]}>
-            Read
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modeButton, mode === READING_MODES.MANUAL && styles.modeButtonActive]}
-          onPress={() => setMode(READING_MODES.MANUAL)}
-        >
-          <Ionicons
-            name="search"
-            size={20}
-            color={mode === READING_MODES.MANUAL ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
-          />
-          <Text style={[styles.modeButtonText, mode === READING_MODES.MANUAL && styles.modeButtonTextActive]}>
-            Search
-          </Text>
-        </TouchableOpacity>
+      <Animated.View style={[styles.modeSelector, { opacity: fadeAnim }]}>
+        {[
+          { key: READING_MODES.DAILY, icon: 'sunny-outline', label: 'Daily' },
+          { key: READING_MODES.PLAN, icon: 'list-outline', label: 'Plan' },
+          { key: READING_MODES.READ, icon: 'book-outline', label: 'Read' },
+          { key: READING_MODES.MANUAL, icon: 'search-outline', label: 'Search' },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.modeButton, mode === item.key && styles.modeButtonActive]}
+            onPress={() => {
+              if (item.key === READING_MODES.PLAN && !activePlan) {
+                setShowPlansModal(true);
+              } else {
+                setMode(item.key);
+              }
+            }}
+          >
+            <Ionicons
+              name={item.icon}
+              size={18}
+              color={mode === item.key ? theme.colors.primary.pureWhite : theme.colors.text.secondary}
+            />
+            <Text style={[styles.modeButtonText, mode === item.key && styles.modeButtonTextActive]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </Animated.View>
 
-      <Animated.View
-        style={{
-          flex: 1,
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        }}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         {/* Header Card */}
-        <Card style={styles.headerCard}>
+        <View style={styles.headerCard}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Text style={styles.headerLabel}>
@@ -396,28 +346,23 @@ const BibleReaderScreen = ({ navigation }) => {
               <Text style={styles.reference}>
                 {verseData?.reference || 'Loading...'}
               </Text>
-              <TouchableOpacity 
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
                 onPress={() => setShowVersionModal(true)}
-                style={styles.versionButton}
+                style={styles.versionPill}
               >
-                <Text style={styles.versionText}>{currentVersion.name}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.colors.primary.royalBlue} />
+                <Text style={styles.versionPillText}>{selectedVersion}</Text>
+                <Ionicons name="chevron-down" size={14} color={theme.colors.primary.royalBlue} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={handleSpeak} style={styles.speakerButton}>
-              <Ionicons
-                name={isSpeaking ? 'stop-circle' : 'volume-high'}
-                size={32}
-                color={theme.colors.primary.royalBlue}
-              />
-            </TouchableOpacity>
           </View>
-        </Card>
+        </View>
 
         {/* Continuous Reading Book/Chapter Selector */}
         {mode === READING_MODES.READ && (
-          <Card style={styles.searchCard}>
-            <Text style={styles.searchLabel}>Select Book & Chapter:</Text>
+          <View style={styles.searchCard}>
+            <Text style={styles.searchLabel}>Book & Chapter</Text>
             <View style={styles.searchInputs}>
               <TextInput
                 style={[styles.searchInput, styles.searchInputBook]}
@@ -438,16 +383,16 @@ const BibleReaderScreen = ({ navigation }) => {
                 style={styles.searchButton}
                 onPress={loadChapterReading}
               >
-                <Ionicons name="book-outline" size={20} color={theme.colors.primary.pureWhite} />
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.primary.pureWhite} />
               </TouchableOpacity>
             </View>
-          </Card>
+          </View>
         )}
 
         {/* Manual Search Input */}
         {mode === READING_MODES.MANUAL && (
-          <Card style={styles.searchCard}>
-            <Text style={styles.searchLabel}>Enter Bible Reference:</Text>
+          <View style={styles.searchCard}>
+            <Text style={styles.searchLabel}>Enter Reference</Text>
             <View style={styles.searchInputs}>
               <TextInput
                 style={[styles.searchInput, styles.searchInputBook]}
@@ -479,14 +424,17 @@ const BibleReaderScreen = ({ navigation }) => {
                 <Ionicons name="search" size={20} color={theme.colors.primary.pureWhite} />
               </TouchableOpacity>
             </View>
-          </Card>
+          </View>
         )}
 
         {/* Verse Content */}
         <Animated.View style={{ opacity: cardFadeAnim }}>
-          <Card style={styles.verseCard}>
+          <View style={styles.verseCard}>
             {loading ? (
-              <ActivityIndicator size="large" color={theme.colors.primary.royalBlue} />
+              <View style={styles.loadingContent}>
+                <ActivityIndicator size="large" color={theme.colors.primary.royalBlue} />
+                <Text style={styles.loadingText}>Loading...</Text>
+              </View>
             ) : verseText ? (
               <>
                 <Text style={styles.verseText}>{verseText}</Text>
@@ -497,39 +445,53 @@ const BibleReaderScreen = ({ navigation }) => {
                 )}
               </>
             ) : (
-              <Text style={styles.verseText}>No content available</Text>
+              <Text style={styles.emptyText}>No content available</Text>
             )}
-          </Card>
+          </View>
         </Animated.View>
 
-        {/* Test Knowledge Button */}
-        {!loading && verseData && (
-          <Button
-            title="Test Your Knowledge"
-            onPress={() => {
-              navigation.navigate('Quiz', {
-                book: verseData.book || manualBook,
-                chapter: verseData.chapter || manualChapter,
-              });
-            }}
-            variant="outline"
-            icon={<Ionicons name="trophy" size={20} color={theme.colors.primary.royalBlue} />}
-            style={styles.testKnowledgeButton}
-          />
+        {/* Action Row */}
+        {!loading && verseText && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity onPress={handleSpeak} style={styles.actionBtn}>
+              <Ionicons
+                name={isSpeaking ? 'stop-circle' : 'volume-medium'}
+                size={20}
+                color={theme.colors.primary.royalBlue}
+              />
+              <Text style={styles.actionBtnText}>{isSpeaking ? 'Stop' : 'Listen'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
+              <Ionicons name="share-outline" size={20} color={theme.colors.primary.royalBlue} />
+              <Text style={styles.actionBtnText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('Quiz', {
+                  book: verseData?.book || manualBook,
+                  chapter: verseData?.chapter || manualChapter,
+                });
+              }}
+              style={styles.actionBtn}
+            >
+              <Ionicons name="trophy-outline" size={20} color={theme.colors.primary.royalBlue} />
+              <Text style={styles.actionBtnText}>Quiz</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Navigation for Continuous Reading */}
         {mode === READING_MODES.READ && !loading && (
           <View style={styles.navigationButtons}>
             <Button
-              title="◀ Previous Chapter"
+              title="Previous"
               onPress={handlePreviousChapter}
               disabled={readChapter === 1}
               variant="outline"
               style={styles.navButton}
             />
             <Button
-              title="Next Chapter ▶"
+              title="Next Chapter"
               onPress={handleNextChapter}
               style={styles.navButton}
             />
@@ -538,30 +500,32 @@ const BibleReaderScreen = ({ navigation }) => {
 
         {/* Navigation for Reading Plan */}
         {mode === READING_MODES.PLAN && activePlan && (
-          <View style={styles.navigationButtons}>
-            <Button
-              title="Previous"
-              onPress={handlePreviousDay}
-              disabled={currentDay === 0}
-              variant="outline"
-              style={styles.navButton}
-            />
-            <View style={styles.progressInfo}>
-              <Text style={styles.progressText}>
-                {currentDay + 1} / {activePlan.total_days}
-              </Text>
-              <ProgressCircle
-                progress={((currentDay + 1) / activePlan.total_days) * 100}
-                size={40}
-                strokeWidth={4}
+          <View style={styles.planNavigation}>
+            <View style={styles.navigationButtons}>
+              <Button
+                title="Previous"
+                onPress={handlePreviousDay}
+                disabled={currentDay === 0}
+                variant="outline"
+                style={styles.navButton}
+              />
+              <View style={styles.progressInfo}>
+                <ProgressCircle
+                  progress={((currentDay + 1) / activePlan.total_days) * 100}
+                  size={44}
+                  strokeWidth={4}
+                />
+                <Text style={styles.progressText}>
+                  {currentDay + 1}/{activePlan.total_days}
+                </Text>
+              </View>
+              <Button
+                title={currentDay === activePlan.total_days - 1 ? "Done" : "Next"}
+                onPress={handleNextDay}
+                disabled={currentDay >= activePlan.total_days - 1}
+                style={styles.navButton}
               />
             </View>
-            <Button
-              title={currentDay === activePlan.total_days - 1 ? "Done" : "Next"}
-              onPress={handleNextDay}
-              disabled={currentDay >= activePlan.total_days - 1}
-              style={styles.navButton}
-            />
           </View>
         )}
 
@@ -571,12 +535,13 @@ const BibleReaderScreen = ({ navigation }) => {
             title={activePlan ? "Change Plan" : "Start a Plan"}
             onPress={() => setShowPlansModal(true)}
             variant="outline"
-            icon={<Ionicons name="library" size={20} color={theme.colors.primary.royalBlue} />}
+            icon={<Ionicons name="library-outline" size={20} color={theme.colors.primary.royalBlue} />}
             style={styles.changePlanButton}
           />
         )}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
-      </Animated.View>
 
       {/* Reading Plans Modal */}
       <Modal
@@ -587,29 +552,30 @@ const BibleReaderScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose a Reading Plan</Text>
+              <Text style={styles.modalTitle}>Reading Plans</Text>
               <TouchableOpacity onPress={() => setShowPlansModal(false)}>
                 <Ionicons name="close" size={24} color={theme.colors.text.primary} />
               </TouchableOpacity>
             </View>
-            <ScrollView>
-              <Text style={styles.planCount}>{READING_PLANS.length}+ Reading Plans Available</Text>
-            {READING_PLANS.map((template) => (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.planCount}>{READING_PLANS.length} plans available</Text>
+              {READING_PLANS.map((template) => (
                 <TouchableOpacity
                   key={template.id}
                   style={styles.planOption}
                   onPress={() => handleStartPlan(template)}
                 >
                   <View style={[styles.planIcon, { backgroundColor: template.color }]}>
-                    <Ionicons name={template.icon} size={24} color={theme.colors.primary.pureWhite} />
+                    <Ionicons name={template.icon} size={22} color={theme.colors.primary.pureWhite} />
                   </View>
                   <View style={styles.planInfo}>
                     <Text style={styles.planTitle}>{template.title}</Text>
-                    <Text style={styles.planDescription}>{template.description}</Text>
+                    <Text style={styles.planDescription} numberOfLines={2}>{template.description}</Text>
                     <Text style={styles.planDays}>{template.total_days} days</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.text.secondary} />
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.text.light} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -626,8 +592,9 @@ const BibleReaderScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Bible Version</Text>
+              <Text style={styles.modalTitle}>Bible Version</Text>
               <TouchableOpacity onPress={() => setShowVersionModal(false)}>
                 <Ionicons name="close" size={24} color={theme.colors.text.primary} />
               </TouchableOpacity>
@@ -642,16 +609,19 @@ const BibleReaderScreen = ({ navigation }) => {
                   ]}
                   onPress={() => handleVersionChange(version.code)}
                 >
-                  <Text
-                    style={[
-                      styles.versionOptionText,
-                      selectedVersion === version.code && styles.versionOptionTextSelected,
-                    ]}
-                  >
-                    {version.name}
-                  </Text>
+                  <View>
+                    <Text
+                      style={[
+                        styles.versionOptionCode,
+                        selectedVersion === version.code && styles.versionOptionCodeSelected,
+                      ]}
+                    >
+                      {version.code}
+                    </Text>
+                    <Text style={styles.versionOptionName}>{version.name}</Text>
+                  </View>
                   {selectedVersion === version.code && (
-                    <Ionicons name="checkmark" size={20} color={theme.colors.primary.royalBlue} />
+                    <Ionicons name="checkmark-circle" size={22} color={theme.colors.primary.royalBlue} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -670,21 +640,21 @@ const styles = StyleSheet.create({
   },
   modeSelector: {
     flexDirection: 'row',
-    padding: theme.spacing.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: theme.colors.background.primary,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.light,
-    gap: theme.spacing.sm,
+    gap: 6,
   },
   modeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: theme.colors.background.secondary,
   },
   modeButtonActive: {
@@ -698,15 +668,19 @@ const styles = StyleSheet.create({
   modeButtonTextActive: {
     color: theme.colors.primary.pureWhite,
   },
-  content: {
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: theme.spacing.md,
-    gap: theme.spacing.md,
+    padding: 16,
+    flexGrow: 1,
   },
   headerCard: {
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    ...theme.shadows.small,
   },
   header: {
     flexDirection: 'row',
@@ -716,58 +690,67 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerActions: {
+    alignItems: 'flex-end',
+  },
   headerLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.text.light,
     fontWeight: theme.typography.fontWeight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   verseTitle: {
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.primary.royalBlue,
     fontWeight: theme.typography.fontWeight.semibold,
-    marginTop: theme.spacing.xs,
+    marginTop: 4,
   },
   reference: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.primary.royalBlue,
-    fontWeight: theme.typography.fontWeight.semibold,
-    marginTop: theme.spacing.sm,
+    fontSize: theme.typography.fontSize.lg,
+    color: theme.colors.text.primary,
+    fontWeight: theme.typography.fontWeight.bold,
+    marginTop: 4,
   },
-  versionButton: {
+  versionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
-    marginTop: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background.lightBlue,
   },
-  versionText: {
+  versionPillText: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.primary.royalBlue,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontWeight: theme.typography.fontWeight.semibold,
   },
-  speakerButton: {
-    padding: theme.spacing.xs,
-  },
+  // Search
   searchCard: {
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    ...theme.shadows.small,
   },
   searchLabel: {
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: 8,
   },
   searchInputs: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    gap: 8,
     alignItems: 'center',
   },
   searchInput: {
     flex: 1,
-    height: 44,
-    paddingHorizontal: theme.spacing.md,
+    height: 42,
+    paddingHorizontal: 12,
     backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 10,
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text.primary,
   },
@@ -775,88 +758,147 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   searchButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.borderRadius.md,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: theme.colors.primary.royalBlue,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Verse Card
   verseCard: {
-    padding: theme.spacing.lg,
-    minHeight: 300,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 12,
+    ...theme.shadows.small,
   },
   verseText: {
     fontSize: theme.typography.fontSize.lg,
-    lineHeight: theme.typography.fontSize.lg * theme.typography.lineHeight.relaxed,
-    color: theme.colors.text.primary,
+    lineHeight: theme.typography.fontSize.lg * theme.typography.lineHeight.verse,
+    color: theme.colors.text.verse,
+    fontFamily: theme.typography.fontFamily.serif,
   },
   referenceFooter: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    marginTop: theme.spacing.lg,
+    color: theme.colors.text.light,
+    marginTop: 20,
     fontStyle: 'italic',
     textAlign: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+  },
+  emptyText: {
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.light,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  // Action Row
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: theme.colors.background.card,
+    ...theme.shadows.small,
+  },
+  actionBtnText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.primary.royalBlue,
+    fontWeight: theme.typography.fontWeight.medium,
+  },
+  // Navigation
   navigationButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    gap: 10,
+    marginBottom: 12,
   },
   navButton: {
     flex: 1,
   },
+  planNavigation: {
+    marginBottom: 8,
+  },
   progressInfo: {
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: 4,
   },
   progressText: {
-    fontSize: theme.typography.fontSize.sm,
+    fontSize: theme.typography.fontSize.xs,
     color: theme.colors.text.secondary,
     fontWeight: theme.typography.fontWeight.semibold,
   },
   changePlanButton: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: 12,
   },
-  testKnowledgeButton: {
-    marginVertical: theme.spacing.md,
-  },
+  // Modal shared
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: theme.colors.background.primary,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '70%',
-    padding: theme.spacing.lg,
+    padding: 20,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: theme.colors.border.light,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text.primary,
   },
+  // Plans
+  planCount: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: 12,
+  },
   planOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: theme.colors.background.secondary,
-    marginBottom: theme.spacing.sm,
-    gap: theme.spacing.md,
+    marginBottom: 8,
+    gap: 12,
   },
   planIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.md,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -871,36 +913,41 @@ const styles = StyleSheet.create({
   planDescription: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
-    marginTop: theme.spacing.xs,
+    marginTop: 2,
   },
   planDays: {
     fontSize: theme.typography.fontSize.xs,
     color: theme.colors.text.light,
-    marginTop: theme.spacing.xs,
+    marginTop: 2,
   },
+  // Version
   versionOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
     backgroundColor: theme.colors.background.secondary,
   },
   versionOptionSelected: {
     backgroundColor: theme.colors.background.lightBlue,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: theme.colors.primary.royalBlue,
   },
-  versionOptionText: {
+  versionOptionCode: {
     fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text.primary,
   },
-  versionOptionTextSelected: {
-    fontWeight: theme.typography.fontWeight.semibold,
+  versionOptionCodeSelected: {
     color: theme.colors.primary.royalBlue,
+  },
+  versionOptionName: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
   },
 });
 
 export default BibleReaderScreen;
-

@@ -1,0 +1,111 @@
+===================================================
+  CLERK AUTHENTICATION INTEGRATION GUIDE
+  Bible Bro App - Manual Setup
+===================================================
+
+OVERVIEW:
+Replace the current Supabase Auth with Clerk for user authentication.
+Clerk provides a drop-in auth UI, social login, and user management.
+
+---
+
+STEP 1: Install Clerk SDK
+  npm install @clerk/clerk-expo
+
+STEP 2: Get Clerk API Keys
+  - Sign up at https://clerk.com
+  - Create a new application
+  - Copy your Publishable Key from the Clerk Dashboard
+  - Add to your .env file:
+    EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
+
+STEP 3: Set Up ClerkProvider
+  Wrap your app with ClerkProvider in App.js:
+
+  import { ClerkProvider } from '@clerk/clerk-expo';
+  import * as SecureStore from 'expo-secure-store';
+
+  const tokenCache = {
+    async getToken(key) {
+      return SecureStore.getItemAsync(key);
+    },
+    async saveToken(key, value) {
+      return SecureStore.setItemAsync(key, value);
+    },
+  };
+
+  export default function App() {
+    return (
+      <ClerkProvider
+        publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        tokenCache={tokenCache}
+      >
+        {/* Your app content */}
+      </ClerkProvider>
+    );
+  }
+
+  Also install: npm install expo-secure-store
+
+STEP 4: Replace Auth Screens
+  - Replace LoginScreen.js and SignupScreen.js with Clerk components
+  - Use <SignIn /> and <SignUp /> from @clerk/clerk-expo
+  - Or build custom UI using useSignIn() and useSignUp() hooks
+
+STEP 5: Replace useAuth Hook
+  Update src/hooks/useAuth.js:
+
+  import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-expo';
+
+  export const useAuth = () => {
+    const { isSignedIn, signOut } = useClerkAuth();
+    const { user } = useUser();
+
+    return {
+      user: isSignedIn ? {
+        id: user.id,
+        email: user.primaryEmailAddress?.emailAddress,
+      } : null,
+      signOut,
+    };
+  };
+
+STEP 6: Sync Clerk Users with Supabase
+  - When a user signs in with Clerk, create/update their profile in Supabase
+  - Use Clerk's user ID as the primary key in your profiles table
+  - You can use Clerk webhooks or sync on login
+
+STEP 7: Update Supabase Auth Calls
+  Files to update:
+  - src/services/supabase.js: Remove signUp, signIn, signOut functions
+  - Keep all other Supabase calls (profiles, reading plans, quiz, etc.)
+  - Use Clerk user ID instead of Supabase auth user ID
+
+STEP 8: Social Login (Optional)
+  In Clerk Dashboard, enable social providers:
+  - Google
+  - Apple
+  - Facebook
+  Clerk handles the OAuth flow automatically.
+
+---
+
+FILES TO MODIFY:
+  - App.js (add ClerkProvider)
+  - src/hooks/useAuth.js (replace with Clerk hooks)
+  - src/screens/LoginScreen.js (use Clerk sign-in)
+  - src/screens/SignupScreen.js (use Clerk sign-up)
+  - src/services/supabase.js (remove auth functions)
+  - src/navigation/AuthNavigator.js (update auth flow)
+
+NEW DEPENDENCIES:
+  - @clerk/clerk-expo
+  - expo-secure-store
+
+---
+
+NOTES:
+  - Keep Supabase for data storage (profiles, plans, quiz, chat)
+  - Only replace the auth layer with Clerk
+  - Clerk provides email/password, social login, and MFA out of the box
+  - The Clerk Dashboard lets you manage users without building admin UI
